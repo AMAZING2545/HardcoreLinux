@@ -1,0 +1,8 @@
+#!/bin/sh
+
+rm list.sha256
+
+for package in $(ls | grep ".tar"); do
+	echo  -ne "$(sha256sum $package)\t" >> list.sha256
+	echo     "${package/.tar/}" >> list.sha256
+done
