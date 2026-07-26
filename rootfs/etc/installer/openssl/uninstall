@@ -1,0 +1,38 @@
+#!/bin/sh
+
+echo uninstalling openssl
+
+rm /usr/lib/libssl.so.3
+rm /usr/lib/libssl.so
+rm /usr/lib/libcrypto.so
+rm /usr/lib/engines-3/padlock.so
+rm /usr/lib/engines-3/capi.so
+rm /usr/lib/engines-3/loader_attic.so
+rm /usr/lib/engines-3/afalg.so
+rm /usr/lib/pkgconfig/openssl.pc
+rm /usr/lib/pkgconfig/libcrypto.pc
+rm /usr/lib/pkgconfig/libssl.pc
+rm /usr/lib/ossl-modules/legacy.so
+rm /usr/lib/cmake/OpenSSL
+rm /usr/lib/cmake/OpenSSL/OpenSSLConfig.cmake
+rm /usr/lib/cmake/OpenSSL/OpenSSLConfigVersion.cmake
+rm /usr/lib/libcrypto.so.3
+
+rm /usr/bin/openssl
+rm /usr/bin/c_rehash
+rm /etc/ssl/certs
+rm /etc/ssl/openssl.cnf
+rm /etc/ssl/ct_log_list.cnf
+rm /etc/ssl/openssl.cnf.dist
+rm /etc/ssl/misc
+rm /etc/ssl/misc/tsget
+rm /etc/ssl/misc/tsget.pl
+rm /etc/ssl/misc/CA.pl
+rm /etc/ssl/private
+rm /etc/ssl/ct_log_list.cnf.dist
+rmdir /usr/lib
+rmdir /usr/lib/engines-3
+rmdir /etc/ssl
+rmdir /usr/lib/pkgconfig
+rmdir /usr/lib/ossl-modules
+rmdir /usr/lib/cmake

@@ -1,0 +1,3 @@
+#!/bin/sh
+echo uninstalling cled
+rm /usr/bin/cled

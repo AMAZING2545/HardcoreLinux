@@ -1,0 +1,2 @@
+#!/bin/sh
+echo this package has no dependencies

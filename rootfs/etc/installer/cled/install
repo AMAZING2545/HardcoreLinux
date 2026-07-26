@@ -1,0 +1,7 @@
+#!/bin/sh
+chmod 777 /usr/bin/cled
+echo missing dependencies:
+counta=$(ls /etc/installer | grep -c "busybox")
+if [ "$((counta))" -eq 0 ]; then
+	echo busybox
+fi

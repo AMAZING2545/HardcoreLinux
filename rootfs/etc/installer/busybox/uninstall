@@ -1,0 +1,3 @@
+#!/bin/sh
+echo sorry, I cannot uninstall myself since it will break the system
+echo do it manually if you think you're cool, or update busybox

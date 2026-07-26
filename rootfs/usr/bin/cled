@@ -1,0 +1,140 @@
+#!/bin/sh
+escape=""
+main_loop(){
+   while true ; do
+	echo -n "($save)"
+	read -r command
+	cmd=$(for arg in $command;do echo $arg; break; done)
+	case $cmd in
+	"l")
+		list ${command//l/}
+		;;
+	"ow")
+		overwrite ${command//ow/}
+		;;
+	"al")
+		append_line ${command//al/}
+		;;
+	"rl")
+		remove_lines ${command//rl/}
+		;;
+	"w")
+		write ${command//w/}
+		;;
+	"o")
+		save=${command//o /}
+		touch $save
+		cat $save > $file
+		;;
+	"f")
+		cat $file | grep${command//f/}
+		;;
+	"q")
+		exit
+		;;
+	"ee")
+		escape="-e"
+		echo $escape
+		;;
+	"de")
+		escape=""
+		;;
+	*)
+		echo invalid command: $cmd
+		;;
+	esac
+			
+   done
+}
+
+list(){
+	if [ $# -eq 0 ]; then cat -n $file
+	elif [ $# -eq 1 ]; then
+		if [ "$1" == "all" ]; then  cat -n $file
+		else 
+			local line1=$1
+			cat -n $file | head -$line1 | tail -1
+		fi
+	else 
+		local line1=$1
+		local line2=$2
+		cat -n $file | head -$line2 | tail -$((line2-line1+1))
+	fi
+}
+
+overwrite(){
+	local line=$1
+	touch /tmp/cled_cut_upper
+	touch /tmp/cled_cut_lower
+	touch /tmp/cled_working_line
+	cat $file | head -n "$(($1-1))" > /tmp/cled_cut_upper
+	cat $file | tail -n +$(($1+1)) > /tmp/cled_cut_lower
+	echo $escape $(i=0;for word in $@;do
+		if [ $((i)) -ne 0 ]; then 
+			echo -n $word
+				if [ $((i+1)) -ne $# ]; then
+					echo -n ' '
+				fi
+			fi
+		i=$((i+1))
+	done
+	) > /tmp/cled_working_line
+	cat /tmp/cled_working_line >> /tmp/cled_cut_upper
+	cat /tmp/cled_cut_lower >> /tmp/cled_cut_upper
+	cat /tmp/cled_cut_upper > $file
+}
+
+append_line(){	
+	if [ "$1" != "end" ]; then
+		cat $file | head -n "$(($1-1))" > /tmp/cled_cut_upper
+		cat $file | tail -n +$(($1)) > /tmp/cled_cut_lower
+		echo $escape $(i=0;for word in $@;do
+			if [ $((i)) -ne 0 ]; then 
+				echo -n $word
+					if [ $((i+1)) -ne $# ]; then
+						echo -n ' '
+					fi
+				fi
+			i=$((i+1))
+		done
+		)  > /tmp/cled_working_line
+		cat /tmp/cled_working_line >> /tmp/cled_cut_upper
+		cat /tmp/cled_cut_lower >> /tmp/cled_cut_upper
+		cat /tmp/cled_cut_upper > $file
+	else
+		echo $escape $(i=0;for word in $@;do
+			if [ $((i)) -ne 0 ]; then 
+				echo -n $word
+					if [ $((i+1)) -ne $# ]; then
+						echo -n ' '
+					fi
+				fi
+			i=$((i+1))
+		done	
+		)  >> $file
+	fi
+		
+}
+remove_lines(){
+	if [ $# -eq 1 ]; then line2=$1; else line2=$2; fi
+	
+	cat $file | head -n "$(($1-1))"  > /tmp/cled_cut_upper
+	cat $file | tail -n +$(($line2+1))  >> /tmp/cled_cut_upper
+	cat /tmp/cled_cut_upper > $file
+}
+write(){		
+	if [ "/tmp/cled_temp" != "$save" ] && [ $# -eq 0 ] ; then
+		cat "/tmp/cled_temp" > $save; echo saved to $save
+	elif [ "/tmp/cled_temp" != "$save" ] && [ $# -eq 1 ] ; then
+		cat /tmp/cled_tmp > $1; echo saved to $1
+		save=$1
+	else echo bad
+	fi
+}
+
+touch /tmp/cled_temp
+file="/tmp/cled_temp"
+rm $file
+touch /tmp/cled_temp
+if [ $# -ne 0 ]; then cat $1 > $file; save=$1; fi
+main_loop

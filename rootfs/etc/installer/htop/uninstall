@@ -1,0 +1,18 @@
+#!/bin/sh
+
+rm /usr/share/pixmaps/htop.png
+rm /usr/share/icons/hicolor/scalable/apps/htop.svg
+rm /usr/share/man/man1/htop.1
+rm /usr/share/applications/htop.desktop
+rm /usr/bin/htop 
+rmdir /usr
+rmdir /usr/share
+rmdir /usr/share/pixmaps
+rmdir /usr/share/icons
+rmdir /usr/share/icons/hicolor
+rmdir /usr/share/icons/hicolor/scalable
+rmdir /usr/share/icons/hicolor/scalable/apps
+rmdir /usr/share/man
+rmdir /usr/share/man/man1
+rmdir /usr/share/applications
+rmdir /usr/bin

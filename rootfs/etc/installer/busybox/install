@@ -1,0 +1,7 @@
+#!/bin/sh
+echo installing busybox, the swiss army knife of embedded linux!
+/bin/busybox --install
+rm /bin/su
+cp /bin/busybox /bin/su
+chmod +s /bin/su
+echo note: you might need to reinstall some utilities if you use your own

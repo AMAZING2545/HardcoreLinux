@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#!/bin/sh
+echo missing dependencies:
+counta=$(ls /etc/installer | grep -c "ncurses6")
+countb=$(ls /etc/installer | grep -c "musl")
+if [ "$((counta))" -eq 0 ]; then
+	echo hwdata
+fi
+if [ "$((countb))" -eq 0 ]; then
+	echo musl
+fi

@@ -1,0 +1,6 @@
+#!/bin/sh
+echo missing dependencies:
+countb=$(ls /etc/installer | grep -c "musl")
+if [ "$((countb))" -eq 0 ]; then
+	echo musl
+fi
