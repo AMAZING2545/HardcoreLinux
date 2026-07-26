@@ -1,8 +1,0 @@
-NAME="HardCore Linux"
-VERSION="0.3.0"
-ID=hardcore linux
-ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v0.3.0"
-ANSI_COLOR="36"
-HOME_URL=""
-BUG_REPORT_URL=""

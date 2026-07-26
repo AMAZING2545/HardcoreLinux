@@ -1,3 +1,0 @@
-#!/bin/sh
-echo uninstalling hwdata
-rm -r /usr/share/hwdata

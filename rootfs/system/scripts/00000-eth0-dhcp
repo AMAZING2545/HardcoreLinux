@@ -1,5 +1,0 @@
-#!/bin/sh
-
-ifconfig lo up
-ifconfig eth0 up
-nohup udhcpc -i eth0 -B > /dev/null 2>/dev/null &
