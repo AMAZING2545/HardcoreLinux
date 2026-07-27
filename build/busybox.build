@@ -1,0 +1,33 @@
+#!/bin/sh
+echo -n "busybox's source dir "
+read bpath
+echo -n "rootfs dir(with musl and devmusl installed) "
+read ROOTFS
+echo -n ".config file dir "
+read conf
+this_path=$(pwd)
+ROOTFS=$this_path/$ROOTFS
+echo $rootfs
+cp $conf "$bpath/.config" 
+cd $bpath
+rm -r /tmp/stage
+#echo "CONFIG_SYSROOT="$rootfs"" >> .config
+make CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" -j$(nproc)
+make CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" install -j$(nproc)
+mkdir -p /tmp/stage/etc/installer/busybox
+echo 'busybox 1.38.0 musl' > /tmp/stage/etc/installer/busybox/pkinfo
+echo '#!/bin/sh' > /tmp/stage/etc/installer/busybox/install
+echo '
+echo dependencies
+counta=$(ls /etc/installer | grep -c "musl")
+if [ "$((counta))" -eq 0 ]; then
+        echo musl
+fi' >> /tmp/stage/etc/installer/busybox/install
+echo '#!/bin/sh' > /tmp/stage/etc/installer/busybox/uninstall
+chmod 711 /tmp/stage/etc/installer/busybox/*nstall
+rm /tmp/stage/bin/su
+cp /tmp/stage/bin/busybox /tmp/stage/bin/su
+chmod +s /tmp/stage/bin/su
+cd /tmp/stage
+tar -c -p -z $(ls) -f $this_path/busybox.tar
+#rm -r /tmp/stage

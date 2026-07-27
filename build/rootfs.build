@@ -1,0 +1,54 @@
+#!/bin/sh
+
+if [ "$(whoami)" != "root" ]; then echo must be root; exit; fi
+mkdir rootfs
+wd=$(pwd)
+./musl.build
+cd $wd
+tar -xpzf devmusl.tar -C rootfs
+tar -xpzf musl.tar -C rootfs
+tar -xpzf devlinux.tar -C rootfs
+echo -n "busybox-1.38.0
+rootfs
+busybox.config" | ./busybox.build
+tar -xpzf busybox.tar -C rootfs
+cd $wd
+cp flashman rootfs/sbin
+chown 0:0 rootfs/sbin/flashman
+
+cp init rootfs/etc/init
+chown 0:0 rootfs/etc/init
+chmod 711 rootfs/etc/init
+
+printf '%s' '#!/bin/sh
+mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /var /run /mnt /home/test /root /tmp/system
+chown 100:100 /home/test
+ln -s tmp/system system/tmp
+
+echo -ne "nameserver 192.168.1.1\nnameserver 1.1.1.1" > /etc/nameserver
+echo -ne "export LD_LIBRARY_PATH="/usr/lib:/lib"\nexport PATH="/bin:/sbin:/usr/bin:/usr/sbin"" > /etc/profile
+echo -n "passwd: files
+group: files
+shadow: files
+hosts: files dns
+networks: files
+protocols: files
+services: files
+ethers: files
+rpc: files" > /etc/nsswitch.conf
+
+printf "%s" "root:$5$jfY2fKXOj.leSfvS$6f6LEaZoTNLyLxGWYA6cS8haLAk9knl3GdPEtXjWJNC:0:0:root:/root:/bin/sh
+test:$5$sB6vKfEObvN0wvxq$WXhOVw6cP7JeloPA1T41bqdgyKXqVt3hrEqRmxAeL.B:100:100::/home/test:/bin/sh" > /etc/passwd
+echo -n "root:x:0:
+test:x:100:" > /etc/group
+
+echo -n "NAME="HardCore Linux"
+VERSION="0.3.2"
+ID=hardcore linux
+ID_LIKE=HardCore
+PRETTY_NAME="HardCore Linux v0.3.2"
+ANSI_COLOR="36"
+HOME_URL=""
+BUG_REPORT_URL=""" > /etc/os-release
+' | chroot rootfs /bin/sh
+cp initctl rootfs/sbin
