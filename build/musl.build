@@ -18,20 +18,16 @@ echo "ln /usr/lib/libc.so /lib/ld-musl-x86_64.so.1" >> /tmp/stage/etc/installer/
 echo "musl 1.2.6" > /tmp/stage/etc/installer/musl/pkinfo
 echo '#!/bin/sh' > /tmp/stage/etc/installer/musl/uninstall
 printf '%s' "$(for i in $(cd /tmp/stage2; find -type f,l);do echo "rm ${i:1}";done)" >> /tmp/stage/etc/installer/musl/uninstall
+echo -e "\n" >> /tmp/stage/etc/installer/musl/uninstall
 printf '%s' "$(for i in $(cd /tmp/stage2; find -type d);do echo "rmdir ${i:1}";done)" >> /tmp/stage/etc/installer/musl/uninstall
 
 chmod 711 /tmp/stage/etc/installer/musl/uninstall /tmp/stage/etc/installer/musl/install
 
 echo '#!/bin/sh' > /tmp/stage2/etc/installer/devmusl/install
-echo  '
-echo dependencies
-counta=$(ls /etc/installer | grep -c "musl")
-if [ "$((counta))" -eq 0 ]; then
-	echo musl
-fi' >> /tmp/stage2/etc/installer/devmusl/install
 echo 'devmusl 1.2.6 musl' > /tmp/stage2/etc/installer/devmusl/pkinfo
 echo '#!/bin/sh' > /tmp/stage2/etc/installer/devmusl/uninstall
 printf '%s' "$(for i in $(cd /tmp/stage2; find -type f,l);do echo "rm ${i:1}";done)" >> /tmp/stage2/etc/installer/devmusl/uninstall
+echo -e "\n" >> /tmp/stage2/etc/installer/devmusl/uninstall
 printf '%s' "$(for i in $(cd /tmp/stage2; find -type d);do echo "rmdir ${i:1}";done)" >> /tmp/stage2/etc/installer/devmusl/uninstall
 chmod 711 /tmp/stage2/etc/installer/devmusl/uninstall /tmp/stage2/etc/installer/devmusl/install
 cd /tmp/stage

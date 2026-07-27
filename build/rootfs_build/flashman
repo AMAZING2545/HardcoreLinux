@@ -13,14 +13,27 @@ if [ "$1" = "help" ] ; then
 	echo "info pkg"
 	echo "shows info about a package, potentially including dependencies (might require root)"
 elif [ "$1" = "install" ] ; then
-	tar x -zf $2 -C /
+	tar x -f $2 -C /
 	NAME="${2%.*}"
-	sh /etc/installer/$(basename $NAME)/install
+	i=0
+	errors=0
+	echo "missing dependencies"
+	for opt in $(cat /etc/installer/$(basename $NAME)/pkinfo); do
+            		if [ "$(($(ls /etc/installer | grep -c -w "$opt")))" -eq 0 ] && [ "$((i))" -gt 1 ]; then
+            			echo -n "$opt"
+				errors=$((errors+1))
+			fi
+		i=$((i+1))
+	done
+	if [ "$((errors))" -gt 0 ]; then 
+		echo aborting
+		sh /etc/installer/$(basename $NAME)/uninstall
+	else
+		sh /etc/installer/$(basename $NAME)/install
+	fi
 elif [ "$1" = "uninstall" ] ; then
 	sh /etc/installer/$2/uninstall
 	rm -r /etc/installer/$2
-	echo broken packages:
-	cat  /etc/installer/*/pkinfo | grep $2 | grep -Eo '^[^ ]+'
 elif [ "$1" = "info" ] ; then
 	NAME="${2%.*}"
 	cat /etc/installer/$(basename $NAME)/pkinfo

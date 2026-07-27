@@ -17,12 +17,6 @@ make CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/
 mkdir -p /tmp/stage/etc/installer/busybox
 echo 'busybox 1.38.0 musl' > /tmp/stage/etc/installer/busybox/pkinfo
 echo '#!/bin/sh' > /tmp/stage/etc/installer/busybox/install
-echo '
-echo dependencies
-counta=$(ls /etc/installer | grep -c "musl")
-if [ "$((counta))" -eq 0 ]; then
-        echo musl
-fi' >> /tmp/stage/etc/installer/busybox/install
 echo '#!/bin/sh' > /tmp/stage/etc/installer/busybox/uninstall
 chmod 711 /tmp/stage/etc/installer/busybox/*nstall
 rm /tmp/stage/bin/su
