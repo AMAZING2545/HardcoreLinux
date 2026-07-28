@@ -1,0 +1,25 @@
+#!/bin/bash
+
+rm -r /tmp/stage*
+wd=$(pwd)
+cd $dir
+if [ $(whoami) != "root" ]; then echo must be root; exit -1; fi
+./configure CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" --without-ada --without-cxx --without-cxx-binding  --disable-db-install  --without-manpages --with-shared --with-normal --without-tests --host=x86_64-pc-linux-musl
+make -j$(nproc)
+rm -r /tmp/stage
+make DESTDIR=/tmp/stage install -j2
+strip /tmp/stage/usr/lib/*.so*
+mkdir -p /tmp/stage2/usr/lib
+mv /tmp/stage/usr/lib/*.a /tmp/stage2/usr/lib
+mv /tmp/stage/usr/include /tmp/stage2/usr
+mkdir -p /tmp/stage/etc/installer/ncurses6 /tmp/stage2/etc/installer/devncurses6
+echo "ncurses6 6.6 musl" > /tmp/stage/etc/installer/ncurses6/pkinfo
+echo "devncurses6 6.6 ncurses6" > /tmp/stage2/etc/installer/devncurses6/pkinfo
+touch /tmp/stage/etc/installer/ncurses6/install /tmp/stage2/etc/installer/devncurses6/install
+echo '#!/bin/sh' > /tmp/stage/etc/installer/ncurses6/install
+echo '#!/bin/sh' > /tmp/stage2/etc/installer/devncurses6/install
+$wd/flashpack /tmp/stage
+$wd/flashpack /tmp/stage2
+ls /tmp/stage*
+cd $wd
+cp /tmp/stage*/*.tar .

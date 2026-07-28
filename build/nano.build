@@ -1,0 +1,14 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+./configure CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib"  --host=x86_64-pc-linux-musl --prefix=/usr
+make -j$(nproc)
+make DESTDIR=/tmp/stage install -j2
+mkdir -p /tmp/stage/etc/installer/nano 
+echo "nano 9.1 musl ncurses6" > /tmp/stage/etc/installer/nano/pkinfo
+rm -r /tmp/stage/usr/share/man /tmp/stage/usr/share/doc
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

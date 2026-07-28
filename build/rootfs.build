@@ -1,30 +1,32 @@
 #!/bin/sh
 
 if [ "$(whoami)" != "root" ]; then echo must be root; exit; fi
-rm -r rootfs_build/rootfs
-mkdir -p rootfs_build/rootfs
+rm -r $ROOTFS
+mkdir -p $ROOTFS
 wd=$(pwd)
 ./musl.build
 cd $wd
-tar -xpzf devmusl.tar -C rootfs_build/rootfs
-tar -xpzf musl.tar -C rootfs_build/rootfs
-tar -xpzf devlinux.tar -C rootfs_build/rootfs
-echo -n "busybox-1.38.0
-rootfs_build/rootfs
-busybox.config" | ./busybox.build
-tar -xpzf busybox.tar -C rootfs_build/rootfs
+tar -xpzf devmusl.tar -C $ROOTFS
+tar -xpzf musl.tar -C $ROOTFS
+tar -xpzf devlinux.tar -C $ROOTFS
+dir=busybox-1.38.0 cfg=busybox.config ROOTFS=$ROOTFS ./busybox.build
+tar -xpzf busybox.tar -C $ROOTFS
 cd $wd
-cp rootfs_build/flashman rootfs_build/rootfs/sbin
-chown 0:0 rootfs_build/rootfs/sbin/flashman
+cp rootfs_build/flashman $ROOTFS/sbin
+chown 0:0 $ROOTFS/sbin/flashman
 
-cp rootfs_build/init rootfs_build/rootfs/etc/init
-chown 0:0 rootfs_build/rootfs/etc/init
-chmod 711 rootfs_build/rootfs/etc/init
+cp rootfs_build/init $ROOTFS/etc/init
+chown 0:0 $ROOTFS/etc/init
+chmod 711 $ROOTFS/etc/init
+
+dir=./openssl-3.5.7 ROOTFS=$ROOTFS ./openssl.build
+dir=./ncurses-6.6 ROOTFS=$ROOTFS ./ncurses.build
+tar -xpzf ncurses6.tar -C $ROOTFS
+tar -xpzf openssl.tar -C $ROOTFS
 
 printf '%s' '#!/bin/sh
-mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /var /run /mnt /home/test /root /tmp/system
+mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /system/tmp /var /run /mnt /home/test /root /tmp/system
 chown 100:100 /home/test
-ln -s tmp/system system/tmp
 
 echo -ne "nameserver 192.168.1.1\nnameserver 1.1.1.1" > /etc/nameserver
 echo -ne "export LD_LIBRARY_PATH="/usr/lib:/lib"\nexport PATH="/bin:/sbin:/usr/bin:/usr/sbin"" > /etc/profile
@@ -38,18 +40,20 @@ services: files
 ethers: files
 rpc: files" > /etc/nsswitch.conf
 
-printf "%s" "root:$5$jfY2fKXOj.leSfvS$6f6LEaZoTNLyLxGWYA6cS8haLAk9knl3GdPEtXjWJNC:0:0:root:/root:/bin/sh
-test:$5$sB6vKfEObvN0wvxq$WXhOVw6cP7JeloPA1T41bqdgyKXqVt3hrEqRmxAeL.B:100:100::/home/test:/bin/sh" > /etc/passwd
+printf "%s" "root::0:0:root:/root:/bin/sh
+test::100:100::/home/test:/bin/sh" > /etc/passwd
 echo -n "root:x:0:
 test:x:100:" > /etc/group
 
 echo -n "NAME="HardCore Linux"
-VERSION="0.3.2"
+VERSION="0.4.0"
 ID=hardcore linux
 ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v0.3.2"
+PRETTY_NAME="HardCore Linux v0.4.0"
 ANSI_COLOR="36"
 HOME_URL=""
 BUG_REPORT_URL=""" > /etc/os-release
-' | chroot rootfs_build/rootfs /bin/sh
-cp rootfs_build/initctl rootfs_build/rootfs/sbin
+' | chroot $ROOTFS /bin/sh
+cp rootfs_build/initctl $ROOTFS/sbin
+(cd $ROOTFS; tar cpz $(ls)) > rootfs.tar
+echo rootfs.tar is ready
