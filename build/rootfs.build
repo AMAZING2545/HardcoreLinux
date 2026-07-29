@@ -76,7 +76,18 @@ cp -r rootfs_build/scripts $ROOTFS/system
 cp -r rootfs_build/drivers $ROOTFS/system
 tar -xpzf rootfs_build/drivers.tar -C $ROOTFS/lib
 
+
+#installing certificates
 wget https://curl.se/ca/cacert.pem -O $ROOTFS/etc/ssl/certs/ca-certificates.crt
+
+
+
+rm $ROOTFS/bin/sh $ROOTFS/bin/ash
+printf '%s' '#!/bin/busybox ash
+$(cat /etc/profile)
+exec /bin/busybox ash' > $ROOTFS/bin/ash
+ln $ROOTFS/bin/ash $ROOTFS/bin/sh
+chmod 755 $ROOTFS/bin/ash
 
 printf '%s' '#!/bin/sh
 mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /system/tmp /var /run /mnt /home/test /root /tmp/system
