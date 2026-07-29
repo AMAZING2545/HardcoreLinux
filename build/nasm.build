@@ -1,0 +1,14 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+./configure CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" --disable-gc --enable-lto --prefix=/usr --host=x86_64-pc-linux-musl --disable-gdb
+make DESTDIR=/tmp/stage install -j$(nproc)
+mkdir -p /tmp/stage/etc/installer/nasm
+echo "nasm 3.02 musl zlib" > /tmp/stage/etc/installer/nasm/pkinfo
+rm -r /tmp/stage/usr/share/man
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

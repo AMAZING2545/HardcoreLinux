@@ -1,5 +1,7 @@
 #!/bin/sh
 clear
+echo Hardcore init v1.3.2
+
 mount -t proc proc /proc
 mount -t sysfs sys /sys
 mount -t devpts devpts /dev/pts
@@ -36,18 +38,18 @@ echo 'executing scripts in /system/scripts'
 
 for script in $(ls /system/scripts); do                                                 
         echo [  ok  ] executing script ${script:6} #format=xxxxx-scriptname             
-        /system/scripts/$script                                                         
+        /system/scripts/$script &                                                     
 done
 
 echo 'starting services in /system/services'
 
 for service in $(ls /system/services); do 
-        (while true; do                                                             
+        (while true; do
+                while [ $(cat /system/tmp/services | grep -c ${service:6}) == "0" ] ; do
+					sleep 2
+				done
                 echo [  ok  ] started service ${service:6} #format=xxxxx-servicename
                	/system/services/$service                               
-                while [ $(cat /system/tmp/services | grep -c ${service:6}) == "0" ] ; do
-			sleep 2
-		done
 		echo [  bad  ] service ${service:6} died, respawning                
         done) &                                                                     
 done                                                                                

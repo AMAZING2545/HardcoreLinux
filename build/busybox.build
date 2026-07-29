@@ -1,4 +1,5 @@
 #!/bin/sh
+wd=$(pwd)
 cp $cfg "$dir/.config" 
 cd $dir
 echo $ROOTFS
@@ -15,5 +16,5 @@ rm /tmp/stage/bin/su
 cp /tmp/stage/bin/busybox /tmp/stage/bin/su
 chmod +s /tmp/stage/bin/su
 cd /tmp/stage
-tar -c -p -z $(ls) -f $this_path/busybox.tar
+tar -c -p -z $(ls) -f $wd/busybox.tar
 rm -r /tmp/stage

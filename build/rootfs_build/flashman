@@ -20,7 +20,7 @@ elif [ "$1" = "install" ] ; then
 	echo "missing dependencies"
 	for opt in $(cat /etc/installer/$(basename $NAME)/pkinfo); do
             		if [ "$(($(ls /etc/installer | grep -c -w "$opt")))" -eq 0 ] && [ "$((i))" -gt 1 ]; then
-            			echo -n "$opt"
+            			echo -n "$opt\t"
 				errors=$((errors+1))
 			fi
 		i=$((i+1))

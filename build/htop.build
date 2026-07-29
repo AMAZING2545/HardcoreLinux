@@ -9,6 +9,7 @@ make DESTDIR=/tmp/stage install -j2
 mkdir -p /tmp/stage/etc/installer/htop 
 echo "htop 3.5.2 musl ncurses libunwind" > /tmp/stage/etc/installer/htop/pkinfo
 rm -r /tmp/stage/usr/share/man
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
 cd $wd
 ./flashpack /tmp/stage
 cp /tmp/stage/*.tar .

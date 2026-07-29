@@ -14,6 +14,9 @@ mv /tmp/stage/usr/include /tmp/stage2/usr
 mv /tmp/stage/usr/lib/*.a /tmp/stage2/usr/lib
 echo "openssl 3.5.7 musl" > /tmp/stage/etc/installer/openssl/pkinfo
 echo "devopenssl 3.5.7 openssl" > /tmp/stage2/etc/installer/devopenssl/pkinfo
+
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+
 cd $wd
 ./flashpack /tmp/stage
 ./flashpack /tmp/stage2

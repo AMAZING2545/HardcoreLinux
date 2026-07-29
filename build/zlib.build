@@ -1,0 +1,13 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast -m64" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" ./configure --prefix=/usr --eprefix=/usr;  make DESTDIR=/tmp/stage install -j4
+mkdir -p /tmp/stage/etc/installer/zlib
+echo "zlib 1.3.2 musl" > /tmp/stage/etc/installer/zlib/pkinfo
+rm -r /tmp/stage/usr/share/man
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .
