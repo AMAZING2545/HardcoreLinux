@@ -69,7 +69,7 @@ chown 0:0 $ROOTFS/sbin/flashman
 
 cp rootfs_build/init $ROOTFS/etc/init
 chown 0:0 $ROOTFS/etc/init
-chmod 711 $ROOTFS/etc/init
+chmod 744 $ROOTFS/etc/init
 
 cp -r rootfs_build/services $ROOTFS/system
 cp -r rootfs_build/scripts $ROOTFS/system
@@ -85,7 +85,7 @@ wget https://curl.se/ca/cacert.pem -O $ROOTFS/etc/ssl/certs/ca-certificates.crt
 rm $ROOTFS/bin/sh $ROOTFS/bin/ash
 printf '%s' '#!/bin/busybox ash
 $(cat /etc/profile)
-exec /bin/busybox ash' > $ROOTFS/bin/ash
+exec /bin/busybox ash $@' > $ROOTFS/bin/ash
 ln $ROOTFS/bin/ash $ROOTFS/bin/sh
 chmod 755 $ROOTFS/bin/ash
 

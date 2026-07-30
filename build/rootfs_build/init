@@ -1,6 +1,6 @@
 #!/bin/sh
 clear
-echo Hardcore init v1.3.2
+echo Hardcore init v1.4.0
 
 mount -t proc proc /proc
 mount -t sysfs sys /sys
@@ -11,6 +11,7 @@ chmod 1777 /tmp
 mkdir /tmp/system
 mount --bind /tmp/system /system/tmp
 
+$(cat /etc/profile)
 
 echo [  ok  ] mounted VFS nodes
 (sleep 1
@@ -38,7 +39,8 @@ echo 'executing scripts in /system/scripts'
 
 for script in $(ls /system/scripts); do                                                 
         echo [  ok  ] executing script ${script:6} #format=xxxxx-scriptname             
-        /system/scripts/$script &                                                     
+        /system/scripts/$script &                           
+        sleep 0.05
 done
 
 echo 'starting services in /system/services'
