@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+#make distclean
+CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib -Wl,-rpath,/usr/lib" ./configure --host=x86_64-pc-linux-musl   --disable-xmlto --disable-rst2man --with-librt=no --with-udev-rules-dir=/no
+DESTDIR=/tmp/stage make install -j$(nproc) #REMEMBER TO REMOVE ALL .LA FILES FROM THE ROOTFS BEFORE BUILDING
+mkdir -p /tmp/stage/etc/installer/alsautils
+echo "alsautils 1.2.16.2 musl libalsa ncurses6" > /tmp/stage/etc/installer/alsautils/pkinfo
+rm -r /tmp/stage/usr/share/man
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

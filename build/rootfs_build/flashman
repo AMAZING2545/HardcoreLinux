@@ -1,0 +1,44 @@
+#!/bin/sh
+
+if [ "$1" = "help" ] ; then
+	echo "hardcore linux package manager (AKA flashman)"
+	echo options:
+	echo
+	echo "install pkgdir"
+	echo "installs a package from a tar archive (requires root)"
+	echo
+	echo "uninstall pkg"
+	echo "uninstalls a package by name (requires root)"
+	echo
+	echo "info pkg"
+	echo "shows info about a package, potentially including dependencies (might require root)"
+elif [ "$1" = "install" ] ; then
+	tar x -f $2 -C /
+	NAME="${2%.*}"
+	i=0
+	errors=0
+	echo "missing dependencies"
+	for opt in $(cat /etc/installer/$(basename $NAME)/pkinfo); do
+            		if [ "$(($(ls /etc/installer | grep -c -w "$opt")))" -eq 0 ] && [ "$((i))" -gt 1 ]; then
+            			echo -n "$opt\t"
+				errors=$((errors+1))
+			fi
+		i=$((i+1))
+	done
+	if [ "$((errors))" -gt 0 ]; then 
+		echo aborting
+		sh /etc/installer/$(basename $NAME)/uninstall
+	else
+		sh /etc/installer/$(basename $NAME)/install
+	fi
+elif [ "$1" = "uninstall" ] ; then
+	sh /etc/installer/$2/uninstall
+	rm -r /etc/installer/$2
+elif [ "$1" = "info" ] ; then
+	NAME="${2%.*}"
+	cat /etc/installer/$(basename $NAME)/pkinfo
+elif [ "$1" = "list" ] ; then
+	ls /etc/installer
+else
+	echo run flashman help
+fi

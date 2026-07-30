@@ -1,0 +1,20 @@
+#!/bin/sh
+wd=$(pwd)
+cp $cfg "$dir/.config" 
+cd $dir
+echo $ROOTFS
+rm -r /tmp/stage
+#echo "CONFIG_SYSROOT="$ROOTFS"" >> .config
+make CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" -j$(nproc)
+make CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" install -j$(nproc)
+mkdir -p /tmp/stage/etc/installer/busybox
+echo 'busybox 1.38.0 musl' > /tmp/stage/etc/installer/busybox/pkinfo
+echo '#!/bin/sh' > /tmp/stage/etc/installer/busybox/install
+echo '#!/bin/sh' > /tmp/stage/etc/installer/busybox/uninstall
+chmod 711 /tmp/stage/etc/installer/busybox/*nstall
+rm /tmp/stage/bin/su
+cp /tmp/stage/bin/busybox /tmp/stage/bin/su
+chmod +s /tmp/stage/bin/su
+cd /tmp/stage
+tar -c -p -z $(ls) -f $wd/busybox.tar
+rm -r /tmp/stage

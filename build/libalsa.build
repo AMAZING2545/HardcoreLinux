@@ -1,0 +1,15 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" ./configure --disable-python --disable-old-symbols --host=x86_64-pc-linux-musl
+make DESTDIR=/tmp/stage install -j4
+mkdir -p /tmp/stage/etc/installer/libalsa
+echo "libalsa 1.2.16.2 musl" > /tmp/stage/etc/installer/libalsa/pkinfo
+rm -r /tmp/stage/usr/share/man
+rm -f /tmp/stage/usr/lib/*.la
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

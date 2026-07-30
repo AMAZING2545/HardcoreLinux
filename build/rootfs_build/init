@@ -1,0 +1,63 @@
+#!/bin/sh
+clear
+echo Hardcore init v1.4.0
+
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+chmod 1777 /tmp
+mkdir /tmp/system
+mount --bind /tmp/system /system/tmp
+
+$(cat /etc/profile)
+
+echo [  ok  ] mounted VFS nodes
+(sleep 1
+echo "/sbin/mdev" > /proc/sys/kernel/hotplug
+mdev -s
+echo [  ok  ] started mdev
+) &
+
+echo 'starting core drivers in /system/drivers/modprobe'                 
+for driver in $(sort -n /system/drivers/modprobe); do                    
+        echo [  ok  ] loading driver ${driver:6} #format=xxxxx-drivername
+        /sbin/modprobe ${driver:6}
+done
+
+for i in 1 2 3 4 5 6; do
+	(while true ; do
+                echo [  ok  ] started login screen at tty$i
+                /sbin/getty 0 tty$i
+        	echo stopped tty$1
+	done
+	) &
+done
+
+echo 'executing scripts in /system/scripts'
+
+for script in $(ls /system/scripts); do                                                 
+        echo [  ok  ] executing script ${script:6} #format=xxxxx-scriptname             
+        /system/scripts/$script &                           
+        sleep 0.05
+done
+
+echo 'starting services in /system/services'
+
+for service in $(ls /system/services); do 
+        (while true; do
+                while [ $(cat /system/tmp/services | grep -c ${service:6}) == "0" ] ; do
+					sleep 2
+				done
+                echo [  ok  ] started service ${service:6} #format=xxxxx-servicename
+               	/system/services/$service                               
+		echo [  bad  ] service ${service:6} died, respawning                
+        done) &                                                                     
+done                                                                                
+                                                                                    
+
+
+while true; do
+	sleep 100
+done

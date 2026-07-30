@@ -1,0 +1,22 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+rm $wd/binutils.tar
+rm $(find $dir -name config.cache)
+#sudo CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" ./configure     --prefix=/usr     --sysconfdir=/etc    --disable-gold  --disable-libquadmath  --host=x86_64-linux-gnu --target=x86_64-linux-musl --disable-nls --disable-werror --disable-gprofng
+#make -j$(nproc)
+make DESTDIR=/tmp/stage install -j$(nproc)
+mkdir -p /tmp/stage/etc/installer/binutils
+echo "binutils 2.47.50 musl zlib" > /tmp/stage/etc/installer/binutils/pkinfo
+rm -r /tmp/stage/usr/share/
+mv /tmp/stage/usr/x86*/lib/ldscripts /tmp/stage/usr/lib/ldscripts
+rm -r /tmp/stage/usr/bin
+mv /tmp/stage/usr/x86*/bin /tmp/stage/usr
+rm -r /tmp/stage/usr/x86*
+#for path in $(ls /tmp/stage/usr/bin); do mv /tmp/stage/usr/bin/$path /tmp/stage/usr/bin/${path/x86_64-linux-musl-}; done
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+wd=$(pwd)
+git clone --depth 1 https://git.musl-libc.org/git/musl
+cd musl
+./configure --prefix=/usr CC=musl-gcc CFLAGS="-Ofast"
+make -j$(nproc)
+rm -r /tmp/stage /tmp/stage2
+mkdir /tmp/stage
+make DESTDIR=/tmp/stage install -j$(nproc)
+mkdir -p /tmp/stage/etc/installer/musl
+mkdir -p /tmp/stage2/usr/include /tmp/stage2/usr/lib /tmp/stage2/etc/installer/devmusl
+mv /tmp/stage/usr/include /tmp/stage2/usr/
+mv /tmp/stage/usr/lib/*.a /tmp/stage2/usr/lib
+mv /tmp/stage/usr/lib/*.o /tmp/stage2/usr/lib
+echo '#!/bin/sh' > /tmp/stage/etc/installer/musl/install
+echo "ln /usr/lib/libc.so /lib/ld-musl-x86_64.so.1" >> /tmp/stage/etc/installer/musl/install
+echo "musl 1.2.6" > /tmp/stage/etc/installer/musl/pkinfo
+echo '#!/bin/sh' > /tmp/stage/etc/installer/musl/uninstall
+printf '%s' "$(for i in $(cd /tmp/stage2; find -type f,l);do echo "rm ${i:1}";done)" >> /tmp/stage/etc/installer/musl/uninstall
+echo -e "\n" >> /tmp/stage/etc/installer/musl/uninstall
+printf '%s' "$(for i in $(cd /tmp/stage2; find -type d);do echo "rmdir ${i:1}";done)" >> /tmp/stage/etc/installer/musl/uninstall
+
+chmod 711 /tmp/stage/etc/installer/musl/uninstall /tmp/stage/etc/installer/musl/install
+
+echo '#!/bin/sh' > /tmp/stage2/etc/installer/devmusl/install
+echo 'devmusl 1.2.6 musl' > /tmp/stage2/etc/installer/devmusl/pkinfo
+echo '#!/bin/sh' > /tmp/stage2/etc/installer/devmusl/uninstall
+printf '%s' "$(for i in $(cd /tmp/stage2; find -type f,l);do echo "rm ${i:1}";done)" >> /tmp/stage2/etc/installer/devmusl/uninstall
+echo -e "\n" >> /tmp/stage2/etc/installer/devmusl/uninstall
+printf '%s' "$(for i in $(cd /tmp/stage2; find -type d);do echo "rmdir ${i:1}";done)" >> /tmp/stage2/etc/installer/devmusl/uninstall
+chmod 711 /tmp/stage2/etc/installer/devmusl/uninstall /tmp/stage2/etc/installer/devmusl/install
+cd /tmp/stage
+tar -c -p -z $(ls) -f $wd/musl.tar
+echo $wd/musl.tar is ready
+cd /tmp/stage2
+tar -c -p -z $(ls) -f $wd/devmusl.tar
+echo $wd/devmusl.tar is ready
+rm -r /tmp/stage*
