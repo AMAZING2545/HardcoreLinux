@@ -115,13 +115,15 @@ rpc: files" > /etc/nsswitch.conf
 
 
 echo -n "NAME="HardCore Linux"
-VERSION="0.5.2-rc2"
+VERSION="1.0.0-rc3"
 ID=hardcore linux
 ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v0.5.2-rc2"
+PRETTY_NAME="HardCore Linux v1.0.0-rc3"
 ANSI_COLOR="36"
-HOME_URL=""
+HOME_URL="https://github.com/amazing2545/hardcorelinux"
 BUG_REPORT_URL=""" > /etc/os-release
+
+chmod 755 /
 ' | chroot $ROOTFS /bin/sh
 cp rootfs_build/initctl $ROOTFS/sbin
 (cd $ROOTFS; tar cpz $(ls)) > rootfs.tar

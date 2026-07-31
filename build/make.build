@@ -1,0 +1,15 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+CC="musl-gcc" CFLAGS="-nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" ./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+mkdir -p /tmp/stage/etc/installer/make
+echo "make 4.4 musl" > /tmp/stage/etc/installer/make/pkinfo
+rm -r /tmp/stage/usr/share/
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

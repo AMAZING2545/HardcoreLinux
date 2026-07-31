@@ -1,0 +1,12 @@
+#!/bin/sh
+
+case "$1" in
+	deconfig)
+		ifconfig $interface 0.0.0.0
+		;;
+	renew|bound)
+		ifconfig $interface $ip netmask $subnet
+		ip route add default via $router dev $interface
+	;;
+esac
+

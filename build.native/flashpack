@@ -1,0 +1,14 @@
+#!/bin/sh
+
+cd $1
+
+rm *.tar
+
+touch etc/installer/$(ls etc/installer/)/uninstall
+printf '%s' "$(for i in $(find -type f);do echo "rm ${i:1}";done)" >> etc/installer/$(ls etc/installer/)/uninstall
+echo -e "\n" >> etc/installer/$(ls etc/installer/)/uninstall
+printf '%s' "$(for i in $(find -type l);do echo "rm ${i:1}";done)" >> etc/installer/$(ls etc/installer/)/uninstall
+echo -e "\n" >> etc/installer/$(ls etc/installer/)/uninstall
+printf '%s' "$(for i in $(find -type d);do echo "rmdir ${i:1}";done)" >> etc/installer/$(ls etc/installer/)/uninstall
+
+tar -cpz $(ls) -f "$(ls etc/installer).tar"
