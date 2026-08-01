@@ -8,7 +8,7 @@ case "$1" in
 			;;
 		"stop")
 			echo "$(grep -v "$2" /system/tmp/services)" > /system/tmp/services
-			kill -9 "$(pgrep -x "$(ls /system/services | grep $2)")"
+			kill -9 "$(pgrep -p -- -"$(ls /system/services | grep $2)")"
 			;;
 		"info")
 			TMP=$(ls /system/services | grep "$2") 
