@@ -10,14 +10,14 @@ cd $wd
 tar -xpzf devmusl.tar -C $ROOTFS
 tar -xpzf musl.tar -C $ROOTFS
 tar -xpzf devlinux.tar -C $ROOTFS
-tar -xpzf terminfo.tar -C $ROOTFS
+#tar -xpzf terminfo.tar -C $ROOTFS
 
-echo compiling openssl
-sleep 1
+#echo compiling openssl
+#sleep 1
 
-dir=./openssl-3.5.7 ROOTFS=$ROOTFS ./openssl.build
-tar -xpzf openssl.tar -C $ROOTFS
-tar -xpzf devopenssl.tar -C $ROOTFS
+#dir=./openssl-3.5.7 ROOTFS=$ROOTFS ./openssl.build
+#tar -xpzf openssl.tar -C $ROOTFS
+#tar -xpzf devopenssl.tar -C $ROOTFS
 
 echo compiling busybox
 sleep 1
@@ -28,41 +28,41 @@ tar -xpzf busybox.tar -C $ROOTFS
 dir=e2fsprogs ROOTFS=$ROOTFS ./e2fsprogs.build
 tar -xpzf e2fsprogs.tar -C $ROOTFS
 
-echo compiling ncurses
-sleep 1
+#echo compiling ncurses
+#sleep 1
 
-dir=./ncurses-6.6 ROOTFS=$ROOTFS ./ncurses.build
+#dir=./ncurses-6.6 ROOTFS=$ROOTFS ./ncurses.build
 
-echo compiling zlib
-sleep 1
+#echo compiling zlib
+#sleep 1
 
-dir=./zlib-1.3.2 ROOTFS=$ROOTFS ./zlib.build
+#dir=./zlib-1.3.2 ROOTFS=$ROOTFS ./zlib.build
 
 tar -xpzf ncurses6.tar -C $ROOTFS
 tar -xpzf zlib.tar -C $ROOTFS
-tar -xpzf devncurses6.tar -C $ROOTFS
+#tar -xpzf devncurses6.tar -C $ROOTFS
 
-echo compiling unwind
-sleep 1
+#echo compiling unwind
+#sleep 1
 
-dir=libunwind ROOTFS=$ROOTFS ./libunwind.build
+#dir=libunwind ROOTFS=$ROOTFS ./libunwind.build
 
-echo compiling libALSA
-sleep 1
+#echo compiling libALSA
+#sleep 1
 
-dir=./alsa-lib-1.2.16.1 ROOTFS=$ROOTFS ./libalsa.build
+#dir=./alsa-lib-1.2.16.1 ROOTFS=$ROOTFS ./libalsa.build
 tar -xpzf libalsa.tar -C $ROOTFS
 
-echo compiling ALSAutils
-sleep 1
+#echo compiling ALSAutils
+#sleep 1
 
-dir=./alsa-utils-1.2.9 ROOTFS=$ROOTFS ./alsautils.build
+#dir=./alsa-utils-1.2.9 ROOTFS=$ROOTFS ./alsautils.build
 tar -xpzf alsautils.tar -C $ROOTFS
 tar -xpzf libunwind.tar -C $ROOTFS
-tar -xpzf devlibunwind.tar -C $ROOTFS
-dir=./htop ROOTFS=$ROOTFS ./htop.build
+#tar -xpzf devlibunwind.tar -C $ROOTFS
+#dir=./htop ROOTFS=$ROOTFS ./htop.build
 tar -xpzf htop.tar -C $ROOTFS
-dir=./nano-9.1 ROOTFS=$ROOTFS ./nano.build
+#dir=./nano-9.1 ROOTFS=$ROOTFS ./nano.build
 tar -xpzf nano.tar -C $ROOTFS
 
 
