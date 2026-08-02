@@ -1,11 +1,16 @@
 #!/bin/sh
 
-if [ "$(whoami)" != "root" ]; then echo "must be root (not tested with fakeroot yet)"; exit; fi
+#
+#			UNCOMMENT THE LINES THAT START WITH DIR= IF YOU WANT TO BUILD FROM SOURCE
+#
+#
+
+if [ "$(whoami)" != "root" ]; then echo must be root; exit; fi
 rm -r $ROOTFS
 rm rootfs.tar
 mkdir -p $ROOTFS
 wd=$(pwd)
-./musl.build
+#./musl.build
 cd $wd
 tar -xpzf devmusl.tar -C $ROOTFS
 tar -xpzf musl.tar -C $ROOTFS
@@ -15,28 +20,25 @@ tar -xpzf terminfo.tar -C $ROOTFS
 echo compiling openssl
 sleep 1
 
-dir=./openssl-3.5.7 ROOTFS=$ROOTFS ./openssl.build
+#dir=./openssl-3.5.7 ROOTFS=$ROOTFS ./openssl.build
 tar -xpzf openssl.tar -C $ROOTFS
-tar -xpzf devopenssl.tar -C $ROOTFS
+#tar -xpzf devopenssl.tar -C $ROOTFS
 
 echo compiling busybox
 sleep 1
 
-dir=busybox-1.38.0 cfg=busybox.config ROOTFS=$ROOTFS ./busybox.build
+#dir=busybox-1.38.0 cfg=busybox.config ROOTFS=$ROOTFS ./busybox.build
 tar -xpzf busybox.tar -C $ROOTFS
-
-dir=e2fsprogs ROOTFS=$ROOTFS ./e2fsprogs.build
-tar -xpzf e2fsprogs.tar -C $ROOTFS
 
 echo compiling ncurses
 sleep 1
 
-dir=./ncurses-6.6 ROOTFS=$ROOTFS ./ncurses.build
+#dir=./ncurses-6.6 ROOTFS=$ROOTFS ./ncurses.build
 
 echo compiling zlib
 sleep 1
 
-dir=./zlib-1.3.2 ROOTFS=$ROOTFS ./zlib.build
+#dir=./zlib-1.3.2 ROOTFS=$ROOTFS ./zlib.build
 
 tar -xpzf ncurses6.tar -C $ROOTFS
 tar -xpzf zlib.tar -C $ROOTFS
@@ -45,26 +47,32 @@ tar -xpzf devncurses6.tar -C $ROOTFS
 echo compiling unwind
 sleep 1
 
-dir=libunwind ROOTFS=$ROOTFS ./libunwind.build
+#dir=libunwind ROOTFS=$ROOTFS ./libunwind.build
 
 echo compiling libALSA
 sleep 1
 
-dir=./alsa-lib-1.2.16.1 ROOTFS=$ROOTFS ./libalsa.build
+#dir=./alsa-lib-1.2.16.1 ROOTFS=$ROOTFS ./libalsa.build
 tar -xpzf libalsa.tar -C $ROOTFS
 
 echo compiling ALSAutils
 sleep 1
 
-dir=./alsa-utils-1.2.9 ROOTFS=$ROOTFS ./alsautils.build
+#dir=./alsa-utils-1.2.9 ROOTFS=$ROOTFS ./alsautils.build
 tar -xpzf alsautils.tar -C $ROOTFS
 tar -xpzf libunwind.tar -C $ROOTFS
 tar -xpzf devlibunwind.tar -C $ROOTFS
-dir=./htop ROOTFS=$ROOTFS ./htop.build
+#dir=./htop ROOTFS=$ROOTFS ./htop.build
 tar -xpzf htop.tar -C $ROOTFS
-dir=./nano-9.1 ROOTFS=$ROOTFS ./nano.build
+#dir=./nano-9.1 ROOTFS=$ROOTFS ./nano.build
 tar -xpzf nano.tar -C $ROOTFS
-
+tar -xpzf popt.tar -C $ROOTFS
+tar -xpzf deve2fsprogs.tar -C $ROOTFS
+tar -xpzf e2fsprogs.tar -C $ROOTFS
+tar -xpzf gfdisk.tar -C $ROOTFS
+tar -xpzf libgcc.tar -C $ROOTFS
+tar -xpzf libstdc++.tar -C $ROOTFS
+cp -a udhcpc $ROOTFS/usr/share
 
 
 cp rootfs_build/flashman $ROOTFS/sbin
@@ -77,20 +85,21 @@ chmod 744 $ROOTFS/etc/init
 cp -r rootfs_build/services $ROOTFS/system
 cp -r rootfs_build/scripts $ROOTFS/system
 cp -r rootfs_build/drivers $ROOTFS/system
-tar -xpzf rootfs_build/drivers.tar -C $ROOTFS/lib #they are actually just firmware
-tar -xpzf my_modules.tar -C $ROOTFS #the one in the repo is actually only for Intel
+chmod 744 -R $ROOTFS/system
+tar -xpzf rootfs_build/drivers.tar -C $ROOTFS/lib
+tar -xpzf my_modules.tar -C $ROOTFS
 
 #installing certificates
 wget https://curl.se/ca/cacert.pem -O $ROOTFS/etc/ssl/certs/ca-certificates.crt
 
-deprecated(){ #ENABLE THIS IF YOU USE A CONTAINER, the init system already handles this
+
+
 rm $ROOTFS/bin/sh $ROOTFS/bin/ash
 printf '%s' '#!/bin/busybox ash
 $(cat /etc/profile)
 exec /bin/busybox ash $@' > $ROOTFS/bin/ash
 ln $ROOTFS/bin/ash $ROOTFS/bin/sh
 chmod 755 $ROOTFS/bin/ash
-}
 
 printf '%s' '#!/bin/sh
 mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /system/tmp /var /run /mnt /home/test /root /tmp/system
@@ -98,8 +107,8 @@ mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /sy
 touch /etc/passwd 
 touch /etc/group
 
-adduser -h /home/test -s /bin/sh -D -u 1000 test
-adduser -h /root -s /bin/sh -D -u 0 root
+echo -e "Hardcore\nHardcore" | adduser -h /home/test -s /bin/sh -u 1000 test
+echo -e "Hardcore\nHardcore" | adduser -h /root -s /bin/sh -u 0 root
 addgroup -g 10 -S audio
 addgroup root audio
 addgroup test audio
@@ -118,10 +127,10 @@ rpc: files" > /etc/nsswitch.conf
 
 
 echo -n "NAME="HardCore Linux"
-VERSION="1.0.0"
+VERSION="1.1.1"
 ID=hardcore linux
 ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v1.0.0"
+PRETTY_NAME="HardCore Linux v1.1.1"
 ANSI_COLOR="36"
 HOME_URL="https://github.com/amazing2545/hardcorelinux"
 BUG_REPORT_URL=""" > /etc/os-release

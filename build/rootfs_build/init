@@ -4,6 +4,7 @@ echo Hardcore init v1.4.0
 
 mount -t proc proc /proc
 mount -t sysfs sys /sys
+mkdir -p /dev/pts
 mount -t devpts devpts /dev/pts
 mount -t tmpfs tmpfs /run
 mount -t tmpfs tmpfs /tmp
@@ -51,7 +52,7 @@ for service in $(ls /system/services); do
 					sleep 2
 				done
                 echo [  ok  ] started service ${service:6} #format=xxxxx-servicename
-               	setsid /system/services/$service                               
+               	/system/services/$service                               
 		echo [  bad  ] service ${service:6} died, respawning                
         done) &                                                                     
 done                                                                                

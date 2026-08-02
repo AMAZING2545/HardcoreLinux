@@ -1,0 +1,16 @@
+#!/bin/sh
+
+echo $dir
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+./configure CC="gcc --sysroot=/" --prefix=/usr
+make  SHELL=/bin/sh -j$(nproc)
+make SHELL=/bin/sh DESTDIR=/tmp/stage install -j2
+mkdir -p /tmp/stage/etc/installer/dropbear
+echo "dropbear 2026.94 openssl zlib" > /tmp/stage/etc/installer/dropbear/pkinfo
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+rm -r /tmp/stage/usr/share
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

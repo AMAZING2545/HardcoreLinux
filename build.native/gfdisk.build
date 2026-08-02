@@ -1,0 +1,14 @@
+#!/bin/sh
+
+echo $dir
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+CXX="g++ --sysroot=/" LDFLAGS=-ltinfo make -j$(nproc)
+mkdir -p /tmp/stage/etc/installer/gfdisk /tmp/stage/usr/sbin
+cp cgdisk gdisk /tmp/stage/usr/sbin
+echo "gfdisk ? musl deve2fsprogs popt" > /tmp/stage/etc/installer/gfdisk/pkinfo
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .
