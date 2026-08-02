@@ -38,6 +38,9 @@ done
 
 echo 'executing scripts in /system/scripts'
 
+chmod 744 -R /system/scripts
+chmod 744 -R /system/services
+
 for script in $(ls /system/scripts); do                                                 
         echo [  ok  ] executing script ${script:6} #format=xxxxx-scriptname             
         /system/scripts/$script &                           
