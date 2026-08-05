@@ -127,10 +127,10 @@ rpc: files" > /etc/nsswitch.conf
 
 
 echo -n "NAME="HardCore Linux"
-VERSION="1.1.1"
+VERSION="1.2.0"
 ID=hardcore linux
 ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v1.1.1"
+PRETTY_NAME="HardCore Linux v1.2.0"
 ANSI_COLOR="36"
 HOME_URL="https://github.com/amazing2545/hardcorelinux"
 BUG_REPORT_URL=""" > /etc/os-release

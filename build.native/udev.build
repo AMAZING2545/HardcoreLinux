@@ -1,0 +1,19 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --enable-static=no --disable-manpages --prefix=/usr
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+rm -r /tmp/stage/usr/share
+mv /tmp/stage/usr/etc /tmp/stage/
+mkdir -p /tmp/stage/etc/installer/udev
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+find /tmp/stage -name *.la -exec rm {} \;
+echo 'eudev 3.2.14 musl' > /tmp/stage/etc/installer/udev/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

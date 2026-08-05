@@ -1,0 +1,19 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+mkdir build
+cd build
+meson setup .. --prefix=/usr -Dtests=false -Ddocumentation=false -Dlibwacom=false -Dmtdev=false -Ddebug-gui=false
+ninja
+meson install --destdir=/tmp/stage
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/libinput
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'libinput 1.31 musl libevdev udev' > /tmp/stage/etc/installer/libinput/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

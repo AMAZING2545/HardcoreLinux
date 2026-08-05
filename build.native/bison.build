@@ -1,0 +1,20 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+rm -rf /tmp/stage/usr/share/doc
+rm -rf /tmp/stage/usr/share/man
+rm -rf /tmp/stage/usr/share/info
+mkdir -p /tmp/stage/etc/installer/bison
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+find /tmp/stage -name *.la -exec rm {} \;
+echo 'bison 3.8 musl' > /tmp/stage/etc/installer/bison/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

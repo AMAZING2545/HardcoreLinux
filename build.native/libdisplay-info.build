@@ -1,0 +1,17 @@
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+rm -r build
+mkdir build
+cd build
+meson setup .. --prefix=/usr --reconfigure
+ninja
+meson install --destdir=/tmp/stage
+mkdir -p /tmp/stage/etc/installer/libdisplay-info
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'libdisplay-info 0.0.0 musl' > /tmp/stage/etc/installer/libdisplay-info/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

@@ -1,0 +1,37 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir/*
+rm -rf /tmp/stage
+mkdir build
+cd build
+meson setup .. --prefix=/usr --reconfigure
+ninja
+meson install --destdir=/tmp/stage
+
+cp $wd/$dir/*/json_*.h /tmp/stage/usr/include
+
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/json-c
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'json-c musl' > /tmp/stage/etc/installer/json-c/pkinfo
+
+mkdir -p /tmp/stage/usr/lib/pkgconfig/
+cat > /tmp/stage/usr/lib/pkgconfig/json-c.pc <<'EOF'
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/
+
+Name: json-c
+Description: A JSON implementation in C
+Version: 0.19
+Libs: -L${libdir} -ljson-c
+Cflags: -I${includedir}
+EOF
+
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+mkdir build
+cd build
+meson setup .. --prefix=/usr --wipe --reconfigure
+meson install --destdir=/tmp/stage
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/wlroots
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'wlroots 0.20.0 musl libevdev udev libinput libwayland libdrm' > /tmp/stage/etc/installer/wlroots/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

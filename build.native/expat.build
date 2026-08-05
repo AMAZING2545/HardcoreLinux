@@ -1,0 +1,17 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --prefix=/usr  --with-dev-urandom --without-examples --without-tests
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+mkdir -p /tmp/stage/etc/installer/expat
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+find /tmp/stage -name *.la -exec rm {} \;
+echo 'expat 2.8.2 musl' > /tmp/stage/etc/installer/expat/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

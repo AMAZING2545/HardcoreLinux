@@ -1,0 +1,18 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/m4
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+find /tmp/stage -name *.la -exec rm {} \;
+echo 'm4 1.4.21 musl' > /tmp/stage/etc/installer/m4/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

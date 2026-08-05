@@ -1,0 +1,17 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --prefix=/usr --enable-static=no
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+mkdir -p /tmp/stage/etc/installer/libffi
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+find /tmp/stage -name *.la -exec rm {} \;
+echo 'libffi 3.7.1 musl' > /tmp/stage/etc/installer/libffi/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

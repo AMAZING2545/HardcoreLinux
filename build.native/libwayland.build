@@ -1,0 +1,18 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+rm -rf build
+mkdir build && cd build
+meson setup .. -Ddocumentation=false -Dprefix=/usr --reconfigure
+ninja
+meson install --destdir=/tmp/stage
+mkdir -p /tmp/stage/etc/installer/libwayland
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'libwayland 1.26.0 musl zlib libpciaccess libdrm libffi' > /tmp/stage/etc/installer/libwayland/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

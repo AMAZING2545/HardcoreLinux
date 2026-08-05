@@ -1,0 +1,21 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+rm -rf build
+mkdir build && cd build
+meson setup .. -Dprefix=/usr -Denable-x11=false -Denable-docs=false  -Ddefault-layout=us --reconfigure
+cp $wd/yacc-wrapper ../scripts/yacc-wrapper
+ninja
+meson install --destdir=/tmp/stage
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/libxkbcommon
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+find /tmp/stage -name '*.la' -exec rm {} \;
+echo 'libxkbcommon 1.14.0-beta musl zlib libffi libwayland wayland-protocols' > /tmp/stage/etc/installer/libxkbcommon/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

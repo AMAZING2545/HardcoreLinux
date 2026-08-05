@@ -1,0 +1,19 @@
+
+
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+mkdir build
+cd build
+meson setup .. --prefix=/usr -Dtests=disabled -Ddocumentation=disabled
+ninja
+meson install --destdir=/tmp/stage
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/libevdev
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'libevdev 1.13.6 musl' > /tmp/stage/etc/installer/libevdev/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

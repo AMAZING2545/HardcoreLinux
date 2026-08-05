@@ -1,0 +1,21 @@
+#!/bin/bash
+
+wd=$(pwd)
+cd $dir
+rm -r /tmp/stage
+make distclean
+./configure --prefix=/usr CC="musl-gcc" CFLAGS="-fPIC -nostdinc --sysroot=${ROOTFS} -isystem ${ROOTFS}/usr/include -I${ROOTFS}/usr/include -Ofast" LDFLAGS="--sysroot=${ROOTFS} -L${ROOTFS}/lib -L${ROOTFS}/usr/lib" --enable-fsck --enable-libuuid --enable-libblkid --enable-elf-shlibs --host=x86_64-linux-musl
+make -j$(nproc)
+make DESTDIR=/tmp/stage install -j2
+mkdir -p /tmp/stage/etc/installer/e2fsprogs /tmp/stage2/etc/installer/deve2fsprogs /tmp/stage2/usr
+echo "e2fsprogs 1.47.4 musl" > /tmp/stage/etc/installer/e2fsprogs/pkinfo
+echo "e2fsprogs 1.47.4 e2fsprogs" > /tmp/stage2/etc/installer/deve2fsprogs/pkinfo
+rm -r /tmp/stage/etc/*.* /tmp/stage/usr/share /tmp/stage/usr/bin /tmp/stage/usr/etc
+mv /tmp/stage/usr/lib /tmp/stage2/usr
+mv /tmp/stage/usr/include /tmp/stage2/usr
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+for file in $(find /tmp/stage2 -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+./flashpack /tmp/stage2
+cp /tmp/stage*/*.tar .
