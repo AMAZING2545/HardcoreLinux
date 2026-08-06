@@ -1,0 +1,17 @@
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+rm -rf build
+mkdir build && cd build
+meson setup .. --prefix=/usr --reconfigure
+ninja
+meson install --destdir=/tmp/stage
+rm -r /tmp/stage/usr/share
+mkdir -p /tmp/stage/etc/installer/fcft
+find /tmp/stage -name '*.so*' -exec strip --strip-all {} \;
+echo 'fcft 3.3.3 pixman libcairo fontconfig fribidi harfbuzz' > /tmp/stage/etc/installer/fcft/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .

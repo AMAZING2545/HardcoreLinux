@@ -5,7 +5,7 @@ cd $dir
 rm -rf /tmp/stage
 mkdir build
 cd build
-meson setup .. --prefix=/usr --wipe --reconfigure
+meson setup .. --prefix=/usr --wipe --reconfigure -Dbackends=libinput,drm
 meson install --destdir=/tmp/stage
 rm -r /tmp/stage/usr/share
 mkdir -p /tmp/stage/etc/installer/wlroots

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+rm -rf build
+mkdir build && cd build
+cmake  .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+mkdir -p /tmp/stage/etc/installer/libutf8proc
+find /tmp/stage -name *.so -exec strip --strip-all {} \;
+echo 'libutf8proc 2.11.3 musl' > /tmp/stage/etc/installer/libutf8proc/pkinfo
+cd $wd
+./flashpack /tmp/stage
+mv /tmp/stage/*.tar .
