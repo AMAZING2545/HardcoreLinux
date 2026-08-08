@@ -43,7 +43,7 @@ echo 'executing scripts in /system/scripts'
 
 for script in $(ls /system/scripts); do
         echo [  ok  ] executing script ${script:6} #format=xxxxx-scriptname
-        /system/scripts/$script &
+        setsid /system/scripts/$script &
         sleep 0.05
 done
 
@@ -55,9 +55,9 @@ for service in $(ls /system/services); do
 			sleep 2
 		done
                 echo [  ok  ] started service ${service:6} #format=xxxxx-servicename
-               	/system/services/$service
+               	setsid /system/services/$service
 		echo [  bad  ] service $service died, respawning
-		if [ $((exhausted)) -ge 10 ]; do
+		if [ $((exhausted)) -ge 10 ]; then
 			echo [  evil  ] $service is locked up, use initctl to manually restart SERVICE_UNSTABLE
 			initctl stop $service
 	                while [ $(cat /system/tmp/services | grep -c ${service:6}) == "0"] ; do

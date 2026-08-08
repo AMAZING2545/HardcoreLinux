@@ -3,15 +3,14 @@
 wd=$(pwd)
 cd $dir
 rm -rf /tmp/stage
-CC="gcc -fPIC --sysroot=/ -Os" ./configure  --prefix=/usr --disable-gil --disable-test-modules --with-openssl=/usr
+CC="gcc -fPIC --sysroot=/ -Os" ./configure  --prefix=/usr --enable-shared --disable-gil --disable-test-modules --with-openssl=/usr
 make -j$(nproc)
 make DESTDIR=/tmp/stage install
 rm -rf /tmp/stage/usr/share
 find /tmp/stage -type d -name __pycache__ -exec rm -r {} +
-rm /tmp/stage/usr/lib/libpython3.14t.a
 find /tmp/stage -name *.so -exec strip --strip-all {} \;
 mkdir -p /tmp/stage/etc/installer/python3
-echo 'python3 3.14.6 musl' > /tmp/stage/etc/installer/python3/pkinfo
+echo 'python3 3.16 musl openssl zlib libffi' > /tmp/stage/etc/installer/python3/pkinfo
 ./flashpack /tmp/stage
 cd $wd
 mv /tmp/stage/*.tar .
