@@ -24,5 +24,16 @@ All of this with 110MB of idle memory usage at maximum (can go to 20/30MB, but f
 
 the repository only contains most software that you would need to compile your own(if you ever need rust, download it from there "https://static.rust-lang.org/dist/rust-1.97.1-x86_64-unknown-linux-musl.tar.xz")
 
+### does Hardcore have a desktop environment?
+
+yes and no
+
+while the base system lacks wayland altogether, it can be installed via the sway package, which will prompt to install a lot
+of dependencies
+
+you will also need udev for libinput to work. after installing udev you will need to create a script and launch udevd and udevadm
+
+then you need to set the renderer to pixman and not opengl(which will crash because wlroots does not like llvmpipe)
+
 ### report bugs
 if you ever find a bug or request a feature, start a issue at https://github.com/AMAZING2545/HardcoreLinux/issues
