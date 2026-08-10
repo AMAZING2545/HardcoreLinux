@@ -11,6 +11,12 @@ TinyCore (impressive for 17MB, but almost nothing works)
 
 Hardcore tries to be minimal while not giving away functionality.
 
+Hardcore, unlike many distros, uses musl libc instead glibc, which is lighter, safer and strictly POSIX
+
+the init system is a shell script that launches scripts and services from /system. a shell script is more auditable than a binary
+
+the package manager is also a script
+
 in 700MB you can fit the base Hardcore system, GCC, G++, LLVM, MESA, Python, many dependencies for Wayland, Wayland itself, a 
 Compositor, A terminal emulator with many terminal apps
 
