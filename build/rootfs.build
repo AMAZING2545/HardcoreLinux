@@ -92,8 +92,6 @@ tar -xpzf my_modules.tar -C $ROOTFS
 #installing certificates
 wget https://curl.se/ca/cacert.pem -O $ROOTFS/etc/ssl/certs/ca-certificates.crt
 
-
-
 #rm $ROOTFS/bin/sh $ROOTFS/bin/ash
 #printf '%s' '#!/bin/busybox ash
 #$(cat /etc/profile)
@@ -102,7 +100,7 @@ wget https://curl.se/ca/cacert.pem -O $ROOTFS/etc/ssl/certs/ca-certificates.crt
 #chmod 755 $ROOTFS/bin/ash
 
 printf '%s' '#!/bin/sh
-mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /system/tmp /var /run /mnt /home/test /root /tmp/system
+mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /system/tmp /system/esp /var /run /mnt /home/test /root /tmp/system
 
 touch /etc/passwd 
 touch /etc/group
@@ -130,7 +128,7 @@ echo -n "NAME="HardCore Linux"
 VERSION="1.2.0"
 ID=hardcore linux
 ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v1.2.0"
+PRETTY_NAME="HardCore Linux v1.3.0"
 ANSI_COLOR="36"
 HOME_URL="https://github.com/amazing2545/hardcorelinux"
 BUG_REPORT_URL=""" > /etc/os-release

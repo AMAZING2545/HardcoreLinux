@@ -11,6 +11,7 @@ mount -t tmpfs tmpfs /tmp
 chmod 1777 /tmp
 mkdir /tmp/system
 mount --bind /tmp/system /system/tmp
+mount /dev/sda1 /system/esp
 
 $(cat /etc/profile)
 

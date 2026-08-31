@@ -1,0 +1,14 @@
+#!/bin/sh
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure.gnu
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+rm /tmp/stage
+mkdir -p /tmp/stage/etc/installer/perl
+echo 'perl 5.44.0 musl m4 zlib' > /tmp/stage/etc/installer/perl/pkinfo
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .
