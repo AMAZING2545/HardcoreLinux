@@ -1,0 +1,14 @@
+#!/bin/sh
+
+## must be built on Alpine or Hardcore
+
+echo $dir
+wd=$(pwd)
+cd $dir
+mkdir -p /tmp/stage/etc/installer/flashman_bin /tmp/stage/usr/bin/
+gcc -O3 flashman.c -o /tmp/stage/usr/bin/flashmanbin
+echo "flashman-bin 0.0.2 busybox musl" > /tmp/stage/etc/installer/flashman_bin/pkinfo
+for file in $(find /tmp/stage -type f); do if [ -x $file ]; then strip $file; fi; done
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

@@ -4,6 +4,11 @@
 #include <unistd.h>
 #include <limits.h>
 #include "include/exec.h"
+#include <sys/stat.h>
+#include <fcntl.h>
+
+long nothing=0;
+long* empty_env={&nothing,0};
 
 int main(int argc, char **argv) {
 
@@ -35,42 +40,41 @@ int main(int argc, char **argv) {
         }
 
         /* 1- Extract the tar archive to / */
-        char *tar_args[] = {"tar", "xf", argv[2], "-C", "/", NULL};
+        char *tar_args[] = {"tar", "xpzf", argv[2], "-C", "/", NULL};
         exec(tar_args[0], tar_args);
 
         /* 2- Remove the .tar*/
 
         char package[PATH_MAX];
         strncpy(package, argv[2], sizeof(package) - 1);
-        package[sizeof(package) - 1] = '\0';
+        package[sizeof(package) - 1] = 0;
 
         char *dot = strrchr(package, '.');
 
         if (dot != NULL) {
-            *dot = '\0';
+            *dot = 0;
         }
 
         /* 3- Dependency check */
 
-        FILE *pkinfo;
         char path[PATH_MAX];
-        char dependency[256];
+        char dependency[4096];
 
         snprintf(path, sizeof(path), "/etc/installer/%s/pkinfo", package);
 
-        pkinfo = fopen(path, "r");
-
-        if (pkinfo == NULL) {
+        int pkinfo_fd = open(path, O_RDONLY);
+        if (pkinfo_fd == -1) {
             perror("ERROR: flashman: cannot open pkinfo");
             return 1;
         }
-
+	char* pkinfo=malloc(4096);
+	read(pkinfo_fd, pkinfo, 4096);
         int i = 0;
         int errors = 0;
 
-        printf("missing dependencies\n");
+        puts("missing dependencies");
 
-        while (fscanf(pkinfo, "%255s", dependency) == 1) {
+        while (sscanf(pkinfo, "%255s", dependency) == 1) {
 
             /* skip first two tokens */
             if (i > 1) {
@@ -88,17 +92,19 @@ int main(int argc, char **argv) {
             i++;
         }
 
-        fclose(pkinfo);
-
         if (errors > 0) {
             printf("\nAborting\n");
-            char uninst_path[PATH_MAX];
-            snprintf(uninst_path, sizeof(uninst_path), "/etc/installer/%s/uninstall", package);
-            system(uninst_path);
+            char* uninst_path=malloc(PATH_MAX);
+            snprintf(uninst_path, PATH_MAX, "/etc/installer/%s/uninstall", package);
+	    chmod(uninst_path,(7<<6)|(5<<3)|5);
+	    char* args[]={"ash",uninst_path};
+	    exec("/bin/ash",args);
         } else {
-            char inst_path[PATH_MAX];
-            snprintf(inst_path, sizeof(inst_path), "/etc/installer/%s/install", package);
-            system(inst_path);
+            char* inst_path=malloc(PATH_MAX);
+            snprintf(inst_path, PATH_MAX, "/etc/installer/%s/install", package);
+            chmod(inst_path,(7<<6)|(5<<3)|5);
+	    char* args[]={"ash",inst_path};
+	    exec("/bin/ash",args);
         }
         return 0;
     }
@@ -107,9 +113,12 @@ int main(int argc, char **argv) {
 
     if (strcmp(argv[1], "uninstall") == 0 && argv[2] != NULL) {
         char *package = argv[2];
-        char uninstall_path[PATH_MAX];
-        snprintf(uninstall_path, sizeof(uninstall_path), "/etc/installer/%s/uninstall", package);
-        system(uninstall_path);
+        char* uninstall_path=malloc(PATH_MAX);
+        snprintf(uninstall_path, PATH_MAX, "/etc/installer/%s/uninstall", package);
+	printf("%s\n",uninstall_path);
+        chmod(uninstall_path,(7<<6)|(5<<3)|5);
+	char* args[]={"ash",uninstall_path};
+	exec("/bin/ash",args);
         return 0;
     }
 
