@@ -1,0 +1,499 @@
+#define FUSE_USE_VERSION 30
+#include <fuse3/fuse.h>
+
+#define NOSTDOUT
+
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include "axfs.h"
+#include <limits.h>
+#include <sys/statvfs.h>
+
+int fd;
+header* a=NULL;
+
+void* _init_(struct fuse_conn_info *conn, struct fuse_config *cfg) {
+	cfg->use_ino = 1;
+	return NULL;
+}
+
+// Forward declarations of your handlers
+int axfs_getattr(const char *path, struct stat *st, struct fuse_file_info* info){
+	printf("requested path: %s\n", path);
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	uint16_t groupc = 1; //getgroups(0, NULL)+1;
+	uint16_t groups = ctx->gid;//malloc(groupc*2);
+	//gid_t* gr = malloc(groupc*4-4);
+	// *groups = getgid();
+	//getgroups(groupc-1, gr);
+	//for(int i = 0; i<groupc;i++)
+	//	groups[i+1]=gr[i];
+	uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
+	//free(gr);
+	//free(groups);
+	printf("user: %d\n",user);
+	if(inum==-1) return -ENOENT;
+	if(inum==-2) return -EACCES;
+	uint32_t dir;
+	if(inum>>32==1) dir = S_IFDIR;
+	else if (inum>>32==2) dir = S_IFLNK;
+	else dir = S_IFREG;
+	printf("inode: %d\n",inum);
+
+	inode inod;
+	get_inode(a, inum, &inod, fd);
+	st->st_ino = (uint32_t)inum + 1;
+	st->st_mode = dir | inod.permissions;
+	st->st_nlink = inod.links;
+	st->st_size = inod.size;
+	st->st_uid = inod.user;
+	st->st_gid = inod.group;
+	st->st_ctime = inod.created;
+	st->st_mtime = inod.modified;
+	st->st_atime = inod.modified;
+	return 0;
+}
+
+int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;//malloc(groupc*2);
+        //gid_t* gr = malloc(groupc*4-4);
+        // *groups = getgid();
+        //getgroups(groupc-1, gr);
+       // for(int i = 0; i<groupc;i++)
+       //         groups[i+1]=gr[i];
+        uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
+        //free(gr);
+        //free(groups);
+        if(inum==-1) return -ENOENT;
+        if(inum==-2) return -EACCES;
+	inode i;
+	if(inum>>32 != 1) return -ENOENT;
+	get_inode(a, inum, &i, fd);
+        file* data = malloc(i.size);
+        read_inode(a, inum, &i, (void*)data, 0, i.size, fd);
+        for(int j = 0; j<i.size/128; j++){
+                if(*((char*)(data+j))!=0){ //if name is not zero
+			struct stat* st = malloc(sizeof(struct stat)); 
+                        inode k;
+                        get_inode(a, (data+j)->inode, &k, fd);
+                        int dir = 0;
+                        if(((data+j)->attributes&1)==1) dir=S_IFDIR;
+			else if (((data+j)->attributes&1)==0) dir=S_IFREG;
+			else if (((data+j)->attributes&1)==2) dir=S_IFLNK;
+		        st->st_ino = 1 + (data+j)->inode;
+		        st->st_mode = dir | k.permissions;
+        		st->st_nlink = k.links;
+       			st->st_size = k.size;
+        		st->st_uid = k.user;
+        		st->st_gid = k.group;
+			st->st_ctime = k.created;
+			st->st_mtime = k.modified;
+			st->st_atime = k.modified;
+
+			filler(buf, (data+j)->name, st, 0, 0);
+                }
+        }
+        free(data);
+	return 0;
+}
+
+int axfs_open(const char *path, struct fuse_file_info *fi) {
+	fi->direct_io = 1;
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;//malloc(groupc*2);
+        //gid_t* gr = malloc(groupc*4-4);
+        // *groups = getgid();
+        //getgroups(groupc-1, gr);
+        //for(int i = 0; i<groupc;i++)
+        //        groups[i+1]=gr[i];
+        uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
+        if(inum==-1) return -ENOENT;
+        if(inum==-2) return -EACCES;
+	inode i;
+	if(inum>>32 == 1) return -EISDIR;
+	if(inum>>32 == 2) return -EPERM;
+	get_inode(a, inum, &i, fd);
+	int mask = 0;
+	printf("read flags: %d\n", O_RDONLY);
+	printf("write flags: %d\n", O_WRONLY);
+	int access_mode = fi->flags & O_ACCMODE;
+	if (access_mode == O_RDONLY) {
+		puts("RDONLY");
+		if (eval_permissions(a, inum, 04, user, &groups, groupc, fd) != 0) return -EACCES;
+	} else if (access_mode == O_WRONLY) {
+		puts("WRONLY");
+		if (eval_permissions(a, inum, 02, user, &groups, groupc, fd) != 0) return -EACCES;
+	} else if (access_mode == O_RDWR) {
+		puts("RDRW");
+		if (eval_permissions(a, inum, 06, user, &groups, groupc, fd) != 0) return -EACCES;
+	}
+	if (fi->flags & O_TRUNC)
+		shrink_inode(a, inum, i.size ,fd);
+	fi->fh=(uint32_t)inum;
+	puts("got there");
+	//free(gr);
+	//free(groups);
+	return 0;
+}
+
+int axfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+	uint32_t inum = fi->fh;
+	inode inod;
+	if(get_inode(a, inum, &inod, fd)==-1) return -EIO;
+	if((fi->flags&O_ACCMODE)==O_WRONLY) return -EACCES;
+	int bytes = read_inode(a, inum, &inod, buf, offset,size,fd);
+	if(bytes==-1) return -EIO;
+	return bytes;
+}
+int axfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+	uint32_t inum = fi->fh;
+	inode inod;
+	if(get_inode(a, inum, &inod, fd)==-1) return -EIO;
+	if((fi->flags&O_ACCMODE)==O_RDONLY) return -EACCES;
+	uint64_t bytes = write_inode(a, inum, buf, offset ,size,fd);
+	if(bytes==-1) return -EIO;
+	return bytes;
+}
+
+int axfs_truncate(const char *path, off_t size,struct fuse_file_info *fi){
+	uint32_t inum = fi->fh;
+	inode inod;
+	if(get_inode(a, inum, &inod, fd)==-1) return -EIO;
+	//if((fi->flags&O_ACCMODE)==O_RDONLY) return -EACCES;
+	int bytes;
+	printf("size of file: %lu\ntarget size:%lu\n", inod.size, size);
+	if(size<inod.size) bytes = shrink_inode(a, inum, inod.size-size ,fd);
+	if(size>inod.size) bytes = extend_inode(a, inum, size-inod.size ,fd);
+	else return 0;
+	if(bytes==-1) return -EIO;
+	return 0;
+}
+
+int axfs_create(const char *path, mode_t mode, struct fuse_file_info *fi){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	uint64_t inod=create_file(a, path,mode,user,&groups,groupc, fd);
+	switch(inod){
+		case -1:
+			return -EACCES;
+		case -2:
+			return -ENOENT;
+		default:
+	}
+	fi->fh = (uint32_t)inod;
+	return 0;
+}
+
+int axfs_unlink(const char *path) {
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	switch(unlink_file(a, path, user, &groups, groupc, fd)){
+		case -1:	return -ENOENT;
+		case -2:	return -EACCES;
+	}
+	return 0;
+}
+
+int axfs_link(const char *linkpath, const char *target){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("link: user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	//find the last entry
+        char* path = calloc(4096,1);
+        strcpy(path,target);
+        uint16_t last_slash_pos = 0;
+        for (int i = 0; i<4096&&*path; i++){
+                if(*(path+i)=='/')
+                        last_slash_pos = i;
+        }
+        *(path+last_slash_pos)=0;
+        puts(path+last_slash_pos+1);
+        uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
+        if(inum==-1||inum==-2)
+                return -EACCES;
+        if(inum>>32==0){
+                puts("not a directory");
+                return -ENOENT;
+        }
+        if(inum>>32==2){
+                puts("refusing to follow symlink");
+                return -ENOENT;
+        }
+        inode inod;
+        get_inode(a, inum, &inod, fd);
+        //check permissions (r, w and x)
+        if(eval_permissions(a,inum, 07, user, &groups, groupc, fd)){
+                puts("permission denied");
+                return -EACCES;
+        }
+        //check if file already exists
+        file* dir=calloc(inod.size/128,128);
+        read_inode(a, inum, &inod, dir, 0, inod.size, fd);
+        int free_slot=-1;
+        for(int i=0; i<inod.size/128; i++){
+                if(*((char*)(dir+i))==0){
+                        free_slot=i;
+                        continue;
+                }
+                else{
+                        if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
+                                printf("%s, exists\n",path+last_slash_pos+1);
+                                return -EEXIST;
+                        }
+                }
+        }
+        inode new_inode={0,0,0,0,0,0,0,0,{0,0}};
+        uint64_t new_inum = path2inode (a, linkpath, user, &groups, groupc, fd);
+        if(new_inum==-1) return -EPERM;
+	if(new_inum==-2) return -EACCES;
+	//if(new_inum>>32!=0)
+	//	return -EPERM;
+	get_inode(a, new_inum, &new_inode,fd);
+	new_inode.links=new_inode.links+1;
+	modify_inode(a, new_inum, &new_inode,fd);
+	file new_file={" ",0,new_inum};
+        strcpy(new_file.name, path+last_slash_pos+1);
+        if(free_slot==-1)
+                //write after
+                write_inode(a,inum,&new_file,inod.size,128,fd);
+        else
+                write_inode(a,inum,&new_file,128*free_slot,128,fd);
+        return 0;
+}
+
+int axfs_mkdir(const char *path, mode_t mode){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("mkdir: user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	switch(create_directory(a, path, mode, user, &groups, groupc, fd)){
+		case -1: return -EACCES;
+		case -2: return -EEXIST;
+		default:
+	}
+	return 0;
+}
+
+int axfs_rmdir(const char *path){
+	//resolve its path
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("rmdir: user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	uint64_t inum = path2inode (a, path ,user, &groups, groupc,fd);
+	printf("inode: %d\n",inum);
+	uint32_t inum2=inum;
+	if(inum==-1||inum==-2)
+                return -EACCES;
+        if(inum>>32==0){
+                puts("not a directory");
+                return -ENOENT;
+        }
+        if(inum>>32==2){
+                puts("refusing to follow symlink");
+                return -ENOENT;
+        }
+	inode inod;
+	get_inode(a,inum,&inod,fd);
+	file* dir = malloc(inod.size);
+	read_inode(a,inum,&inod,dir,0,inod.size,fd);
+	int counter = 0;
+	for(int i = 0; i<inod.size/128; i++)
+		if(*((char*)(dir+i))!=0) counter++;
+	printf("subdirs: %d\n",counter);
+	if(counter > 2) return -ENOENT;
+	//unlink . , .. and the directory itself
+	char* dotdot = calloc(4096,1);
+	int count = 0;
+	for(int i = 0; i<4096; i++){
+		if(*(path+i)==0){*(dotdot+i)='/';	count=i+1;	break;}
+		*(dotdot+i) = *(path+i);
+	}
+	*(dotdot+count)='.';
+	*(dotdot+count+1)='.';
+	printf("unlinking %s\n",dotdot);
+	uint64_t status = unlink_file(a, dotdot, user, &groups, groupc, fd);
+	//free(dotdot);
+	if(status==-1||status==-2)
+                return -EACCES;
+        if(status>>32==2){
+                puts("refusing to follow symlink");
+                return -ENOENT;
+        }
+	printf("unlinking %s\n",path);
+	status = unlink_file(a, path, user, &groups, groupc, fd);
+	if(status==-1||status==-2)
+                return -EACCES;
+        if(status>>32==2){
+                puts("refusing to follow symlink");
+                return -ENOENT;
+        }
+	printf("last inode: %d\n",inum2);
+	delete_inode(a, inum2, fd);
+	return 0;
+}
+
+int axfs_chmod(const char *path, mode_t mode,struct fuse_file_info *fi){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	//printf("rmdir: user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	//puts("got here");
+	//printf("inode: %d\n",fi->fh);
+	uint64_t inum = path2inode(a,path,user,&groups,groupc,fd);
+	if(inum == -1) return -ENOENT;
+	if(inum == -2) return -EPERM;
+	//printf("inode: %d\n",inum);
+	inode inod;
+	get_inode(a,inum,&inod,fd);
+	if(user == 0) goto bypass;
+	if((user != inod.user) && (&groups != inod.group)) return -EACCES;
+	bypass:
+	inod.permissions=mode;
+	modify_inode(a, inum, &inod, fd);
+	return 0;
+}
+
+int axfs_chown(const char *path, uid_t uid, gid_t gid ,struct fuse_file_info *fi){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	//printf("rmdir: user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	//puts("got here");
+	//printf("inode: %d\n",fi->fh);
+	uint64_t inum = path2inode(a,path,user,&groups,groupc,fd);
+	if(inum == -1) return -ENOENT;
+	if(inum == -2) return -EPERM;
+	//printf("inode: %d\n",inum);
+	inode inod;
+	get_inode(a,inum,&inod,fd);
+	if(user == 0) goto bypass;
+	return -EACCES;
+	bypass:
+	inod.user=uid;
+	inod.group=gid;
+	modify_inode(a, inum, &inod, fd);
+	return 0;
+}
+
+int axfs_symlink(const char *target, const char *linkpath) {
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;
+	uint64_t inod=create_symlink(a, linkpath,target,user,&groups,groupc, fd);
+	switch(inod){
+		case -1:
+			return -EACCES;
+		case -2:
+			return -ENOENT;
+		default:
+	}
+
+	return 0;
+}
+
+int axfs_readlink(const char *path, char *buf, size_t size){
+	struct fuse_context *ctx = fuse_get_context();
+	uint16_t user= ctx->uid;
+	printf("user: %d\n",user);
+        uint16_t groupc = 1;//getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;//malloc(groupc*2);
+        uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
+        if(inum==-1) return -ENOENT;
+        if(inum==-2) return -EACCES;
+	inode i;
+	if(inum>>32 == 1) return -EISDIR;
+	if(inum>>32 == 0) return -EPERM;
+	get_inode(a, inum, &i, fd);
+	//no need to evaluate permissions, symlinks are very permissive
+	*(buf+read_inode(a, inum, &i, buf, 0,i.size,fd))=0;
+	return 0;
+}
+
+//this is not possible in the current implementation, just to make tar work
+int axfs_utimens(const char *path, const struct timespec ts[2], struct fuse_file_info *fi) {return 0;}
+
+int axfs_statfs(const char *path, struct statvfs *s) {
+	memset(s, 0, sizeof(struct statvfs));
+	s->f_bsize=1<<a->blocksize;
+	s->f_frsize=1<<a->blocksize;
+	s->f_blocks=a->size;
+	uint64_t free = 0;
+	for(uint64_t i = 0;i<((1<<a->blocksize)*a->fatsize)/6;i++)
+		if(page2int(*(fat+i))==0) free++;
+	s->f_bfree=free;
+	s->f_bavail=free;
+	free=0;
+	for(uint64_t i = 0;i<((1<<a->blocksize)*a->inodes)/32;i++)
+		if((inodes+i)->links==0) free++;
+	s->f_ffree=free;
+	s->f_favail=free;
+	s->f_files=((1<<a->blocksize)*a->inodes)/32;
+	s->f_namemax=122;
+	return 0;
+}
+
+static struct fuse_operations axfs = {
+    .getattr    = axfs_getattr,
+    .readdir    = axfs_readdir,
+    .init	= _init_,
+    .open       = axfs_open,
+    .read       = axfs_read,
+    .write      = axfs_write,
+    .truncate	= axfs_truncate,
+    .create     = axfs_create,
+    .unlink     = axfs_unlink,
+    .link	= axfs_link,
+    .mkdir      = axfs_mkdir,
+    .rmdir      = axfs_rmdir,
+    .chmod	= axfs_chmod,
+    .chown	= axfs_chown,
+    .symlink    = axfs_symlink,
+    .readlink   = axfs_readlink,
+    .utimens	= axfs_utimens,
+    .statfs	= axfs_statfs,
+};
+
+int main(int argc, char* argv[]){
+	a=malloc(sizeof(header));
+	fd = open(argv[1],O_RDWR);
+	read(fd, a, sizeof(header));
+	puts("read header");
+	for (int i = 1; i < argc - 1; i++) {
+		argv[i] = argv[i + 1];
+	}
+	const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
+        const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
+        const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
+        const uint64_t fat_length = (1<<a->blocksize)*a->fatsize;
+	const uint64_t inode_length = (1<<a->blocksize)*a->inodes;
+	fat = (page*)mmap(NULL, fat_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, fat_start);
+	if(fat==-1)
+		perror("mmap failed");
+	inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
+	printf("address of inodes: %lu\n\n",inodes);
+	last=calloc((inode_length/32),12);
+	return fuse_main(argc-1, argv, &axfs, NULL);
+}

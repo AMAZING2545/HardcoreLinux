@@ -1,7 +1,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#ifndef NOSTDOUT
 #include <stdio.h>
+#endif
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
@@ -11,9 +15,25 @@
 #include <errno.h>
 #include <sys/mman.h>
 #include <time.h>
-
+#define BT_BUF_SIZE 100
 #pragma pack(1)
 #pragma once
+#define BUSYWAIT for(int i=0;i<2000000;i++);
+
+#ifdef NOSTDOUT
+
+int puts (const char*){
+	return 0;
+}
+int printf (const char*, ...){
+	return 0;
+}
+int perror (const char*){
+	return 0;
+}
+
+#endif
+
 typedef struct{
         uint8_t reserved[8]; //reserved for a jump instruction (x86 is fine with 3 bytes, but some arches need more)
         uint8_t blocksize; //(2^x), 16 is a healthy maximum
@@ -65,7 +85,21 @@ page int2page(uint64_t a){
 	return b;
 }
 
+page* fat = NULL;
+inode* inodes = NULL;
+
+
+typedef struct {
+	page pag;
+	uint64_t offset;
+}last_page;
+
+last_page* last = NULL;
+
+uint64_t min_free=0;
+
 uint32_t modify_inode(header* a, uint32_t num, inode* inode_struct, int fd){
+	puts("entering modify_inode");
 	const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
 	const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
 	const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + 1);
@@ -76,14 +110,14 @@ uint32_t modify_inode(header* a, uint32_t num, inode* inode_struct, int fd){
 		puts("inode out of range");
 		return -1;
 	}
-	inode* inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
+	/*inode* inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
 	if (inodes == -1) {
                 perror("mmap failed");
                 return -1;
-        }
+        }*/
 	inode_struct->modified=time(NULL);
 	*(inodes+num)=*(inode_struct);
-	munmap(inodes, inode_length);
+	//munmap(inodes, inode_length);
 	if(inode_struct->links==0){
 		return -1;
 	}
@@ -91,6 +125,7 @@ uint32_t modify_inode(header* a, uint32_t num, inode* inode_struct, int fd){
 }
 
 uint32_t get_inode(header* a, uint32_t num, inode* inode_struct, int fd){
+	puts("entering get_inode");
         const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
         const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
         const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + 1);
@@ -101,13 +136,13 @@ uint32_t get_inode(header* a, uint32_t num, inode* inode_struct, int fd){
                 puts("inode out of range");
                 return -1;
         }
-        inode* inodes=mmap(NULL, inode_length, PROT_READ, MAP_SHARED, fd, inode_start);
+        /*inode* inodes=mmap(NULL, inode_length, PROT_READ, MAP_SHARED, fd, inode_start);
         if (inodes == -1) {
                 perror("mmap failed");
                 return -1;
-        }
+        }*/
         *(inode_struct)=*(inodes+num);
-	munmap(inodes, inode_length);
+	//munmap(inodes, inode_length);
 	if(inode_struct->links==0){
 		return -1;
 	}
@@ -115,14 +150,15 @@ uint32_t get_inode(header* a, uint32_t num, inode* inode_struct, int fd){
 }
 
 uint32_t create_new_inode(header* a, inode* inode_struct, int fd){
+	puts("entering create_new_inode");
 	//set the permissions in inode struct first before
 	const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
-	const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
+	const uint64_t fat_tart = (1<<a->blocksize)*(a->resblocks + 1);
 	const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + 1);
 	const uint64_t fat_length = (1<<a->blocksize)*a->fatsize;
 	const uint64_t inode_length = (1<<a->blocksize)*a->inodes;
 	//map inode map and FAT
-	inode* inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
+	/*inode* inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
 	if (inodes == -1) {
                 perror("mmap failed");
                 return -1;
@@ -131,7 +167,7 @@ uint32_t create_new_inode(header* a, inode* inode_struct, int fd){
 	if (fat == -1) {
                 perror("mmap failed");
                 return -1;
-        }
+        }*/
 	for(uint64_t i = 0; i<inode_length/32; i++){
 		if((inodes+i)->links==0){
 			printf("found empty inode at %u\n", i);
@@ -141,7 +177,7 @@ uint32_t create_new_inode(header* a, inode* inode_struct, int fd){
 			//find a free starting FAT, write -1 to sign it as ended
 			for(uint64_t j = 0; i<fat_length/6; j++){
 				if(page2int(*(fat+j))==0){
-					printf("found free FAT at %lu\n", j);
+					printf("\t\t\t\t\tfound free FAT at %lu\n", j);
 					*(fat+j)=int2page(-1);
 					inode_struct->start=int2page(j);
 					*(inodes+i)=*inode_struct;
@@ -151,13 +187,14 @@ uint32_t create_new_inode(header* a, inode* inode_struct, int fd){
 			puts("disk is likely full");
 		}
 	}
-	munmap(inodes, inode_length);
-	munmap(fat, fat_length);
+	//munmap(inodes, inode_length);
+	//munmap(fat, fat_length);
 	printf("all inodes are used\n");
 	return -1;
 }
 
 uint64_t shrink_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
+	puts("entering shrink_inode");
 	//remove count bytes from inode
         const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
         const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
@@ -165,59 +202,62 @@ uint64_t shrink_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
         const uint64_t fat_length = (1<<a->blocksize)*a->fatsize;
 	const uint64_t blocksize = (1<<a->blocksize);
 	int64_t ret = 0;
+
+	(last+inode_num)->offset=0;
+	(last+inode_num)->pag = int2page(0);
+
 	inode inode_struct;
 	if(get_inode(a, inode_num, &inode_struct, fd)==-1){
 		puts("nonexistant inode");
 		return -1;
 	}
+	printf("count: %lu\n",count);
 	page current = inode_struct.start;
-	page* fat = mmap(NULL, fat_length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, fat_start);
-        if (fat == -1) {
-                perror("mmap failed");
-                return -1;
-        }
 	inode_struct.modified=time(NULL);
 	//check if we actually need to deallocate blocks
-	if((inode_struct.size - count)/blocksize == inode_struct.size/blocksize){
-		inode_struct.size=inode_struct.size-count;
-		modify_inode(a, inode_num, &inode_struct, fd);
-		ret = inode_struct.size;
+	uint64_t size=inode_struct.size;
+	uint64_t blocks_before;
+	if(size==0||size==1) blocks_before=1;
+	else blocks_before = (size-1)/blocksize+1;
+
+	uint64_t blocks_after;
+	if(size-count==0) blocks_after=1;
+	else blocks_after = (size-count-1)/blocksize+1;
+
+	printf("shrinking inode %lu\n", inode_num);
+	if(blocks_before==blocks_after){
+		puts("nothing to do");
+		inode_struct.size=size-count;
+		ret=inode_struct.size;
 		goto ret;
 	}
-	//calculate the number of blocks to traverse
-	uint64_t blocks_to_traverse = (inode_struct.size-count)/blocksize;
-	printf("skipping %lu blocks\n",blocks_to_traverse);
-	for(uint64_t i = 0; i<blocks_to_traverse; i++){
-		printf("at block %lu\n",page2int(current));
-		if(page2int(current)==0xFFFFFFFFFFFF){
-			puts("unexpected EOF");
-			ret=-1;
-			goto ret;
-		}
+	skip:
+	printf("traversing %lu blocks\n",blocks_after-1);
+	for(uint64_t i = 0; i<blocks_after-1;i++)
 		current=*(fat+page2int(current));
-	}
+	printf("deallocating %lu blocks\n",blocks_before-blocks_after);
 	page next = *(fat+page2int(current));
-	*(fat+page2int(current))=int2page(-1); // *current now contains -1, current the next block
+	printf("start of chain: %lu\n", next);
+	*(fat+page2int(current))=int2page(-1);
 	current=next;
-	//replace the last with -1 and the rest with 0
-	//calculate how many blocks to zero
-	blocks_to_traverse = inode_struct.size/blocksize - (inode_struct.size - count)/blocksize;
-	printf("zeroing %lu blocks\n",blocks_to_traverse);
-	for(uint64_t i = 0; i<blocks_to_traverse; i++){
-		printf("zeroing %lu\n", page2int(current));
-		next = *(fat+page2int(current));
+	for(uint64_t i=0; i<blocks_before-blocks_after;i++){
+		printf("freeing block %lu\n",next);
+		next=*(fat+page2int(current));
 		*(fat+page2int(current))=int2page(0);
 		current=next;
+		//if(page2int(current)<min_free) min_free=page2int(current);
 	}
-	inode_struct.size-=count;
-	ret = inode_struct.size;
+	min_free=0;
+	inode_struct.size=size-count;
+	ret=size-count;
 	ret:
-		munmap(fat, fat_length);
+		//munmap(fat, fat_length);
 		modify_inode(a, inode_num, &inode_struct, fd);
 		return ret;
 }
 
 int32_t delete_inode(header* a, uint32_t inode_num, int fd){
+	puts("entering delete_inode");
         const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
         const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
         const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
@@ -234,247 +274,265 @@ int32_t delete_inode(header* a, uint32_t inode_num, int fd){
 		return -1;
 	}
 	shrink_inode(a, inode_num, inode_struct.size, fd);
-	page* fat = mmap(NULL, fat_length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, fat_start);
 	*(fat+page2int(inode_struct.start))=int2page(0);
-	if (fat == -1) {
-                perror("mmap failed");
-                return -1;
-        }
 	inode_struct.links=0; //this functionally deletes the inode
 	modify_inode(a, inode_num, &inode_struct, fd);
 	ret = inode_num;
 	ret:
-		munmap(fat, fat_length);
+		//munmap(fat, fat_length);
 		return ret;
 }
 
 int64_t extend_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
-	//add count bytes to inode (not initialized, may contain garbage)
+        puts("entering extend_inode");
+        //add count bytes to inode (not initialized, may contain garbage)
         const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
         const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
         const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
         const uint64_t fat_length = (1<<a->blocksize)*a->fatsize;
-	const uint64_t blocksize = (1<<a->blocksize);
-	int64_t ret = 0;
-	inode inode_struct;
-	if(get_inode(a, inode_num, &inode_struct, fd)==-1){
-		puts("nonexistant inode");
-		return -1;
-	}
-	page current = inode_struct.start;
-	page* fat = mmap(NULL, fat_length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, fat_start);
-        if (fat == -1) {
-                perror("mmap failed");
+        const uint64_t blocksize = (1<<a->blocksize);
+        int64_t ret = 0;
+        inode inode_struct;
+        if(get_inode(a, inode_num, &inode_struct, fd)==-1){
+                puts("nonexistant inode");
                 return -1;
         }
-	inode_struct.modified = time(NULL);
-	//check if we actually need to allocate new blocks
-	if(inode_struct.size%blocksize + count <= blocksize){
-		inode_struct.size=inode_struct.size+count;
-		modify_inode(a, inode_num, &inode_struct, fd);
-		ret = inode_struct.size;
-		goto ret;
+        uint64_t size = inode_struct.size;
+        //calculate if we need new blocks
+        if(size%blocksize+count<=blocksize){
+                if(size%blocksize==0) goto skip;
+                puts("nothing to do");
+                inode_struct.size=size+count;
+                ret=inode_struct.size;
+                goto ret;
+        }
+        skip:
+        page current=inode_struct.start;
+        uint64_t block2stop;
+        if(size==0||size==1)block2stop=0;
+        else block2stop = (size-1)/blocksize;
+	uint64_t alloc = (size+count-1)/blocksize-block2stop;
+	uint8_t lock = 0;
+	printf("cached offset: %lu\n",(last+inode_num)->offset);
+        printf("cached page: %lu\n",page2int((last+inode_num)->pag));
+
+	if( page2int((last+inode_num)->pag) != 0	&&	(last+inode_num)->offset<size ){
+		//recalculate seek
+		block2stop = (size-(last+inode_num)->offset-1)/blocksize;
+		current=(last+inode_num)->pag;
 	}
-	//clamp size
-	printf("requested count: %lu\n",count);
-	count+=inode_struct.size%blocksize - blocksize;
-	inode_struct.size = inode_struct.size - inode_struct.size%blocksize + blocksize;
-	printf("clamped old size: %lu\n",inode_struct.size);
-	printf("clamped count %lu\n",count);
-	//traverse FAT until EOF
-	for(uint64_t i = 0; i<inode_struct.size/blocksize-1; i++){
-		printf("at block %lu\n",page2int(current));
-		if(page2int(current)==0xFFFFFFFFFFFF){
-			puts("unexpected EOF");
-			ret=-1;
-			goto ret;
-		}
-		current=*(fat+page2int(current));
+
+	printf("size: %lu\n",size);
+	printf("traversing %lu blocks\n",block2stop);
+        for(uint64_t i = 0; i<block2stop;i++){
+                current=*(fat+page2int(current));
 	}
-	//find empty blocks and allocate them
-	uint64_t allocate = count/blocksize;
-	if(count%blocksize!=1)
-		allocate++;
-	uint64_t last_free=-1;
-	printf("blocks to allocate: %lu\n", allocate);
-	for(uint64_t i = 0; i<allocate; i++){
-		//find a free block
-		for(uint64_t j = last_free+1; j<fat_length/6; j++){
-			printf("page %lu: %lu\n", j, page2int(*(fat+j)));
+	//now current points to -1
+        //calculate blocks to allocate
+        printf("allocating %lu blocks\n",alloc);
+	uint64_t free=min_free;
+	uint64_t onelast=page2int(current);
+	for(uint64_t i=0; i<alloc;i++){
+                for(uint64_t j=free+1; j<fat_length/6;j++){
+			printf("traversing block %lu\n", j);
 			if(page2int(*(fat+j))==0){
-				last_free=j;
-				*(fat+page2int(current))=int2page(j);
-				printf("found block %lu\n",j);
-				current=int2page(j);
-				break;
+                                printf("empty block at %lu\n",j);
+                                *(fat+page2int(current))=int2page(j);
+                                current=int2page(j);
+				free=j;
+				if(i+2==alloc)
+					onelast=j;
+                                break;
+                        }
+                }
+        }
+	*(fat+free)=int2page(-1);
+	min_free=free;
+        inode_struct.size=size+count;
+        ret=size+count;
+
+	puts("memdump of FAT");
+	for(int i = 0; i<10; i++){
+		printf("%lu\n",page2int(*(fat+i)));
+	}
+
+        ret:
+                printf("new size: %lu\n",inode_struct.size);
+                modify_inode(a, inode_num, &inode_struct, fd);
+
+                return ret;
+}
+
+
+int64_t write_inode(header *a, uint32_t inode_num, void *data,uint64_t seek, uint64_t count, int fd) {
+	const uint64_t blocksize = 1 << a->blocksize;
+	const uint64_t fat_start = blocksize * (a->resblocks + 1);
+	const uint64_t data_start = blocksize * (a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
+	const uint64_t fat_length = blocksize * a->fatsize;
+	inode ino;
+	if (get_inode(a,inode_num, &ino, fd) == -1) return -1;
+	if (seek > ino.size) return -1;
+
+	//expand if necessary
+	if (seek + count > ino.size) {
+		if (extend_inode(a, inode_num,seek+count-ino.size,fd)<0) return -1;
+	 	get_inode(a, inode_num, &ino, fd);
+	}
+	//starting position
+	uint64_t seek_blocks = seek / blocksize;
+	uint64_t seek_bytes= seek % blocksize;
+	page current = ino.start;
+	printf("seek blocks: %lu\n",seek_blocks);
+	printf("cached offset: %lu\n",(last+inode_num)->offset);
+	uint64_t seek_dif = seek_blocks;
+	//checking if cache hit:
+	if( page2int((last+inode_num)->pag) != 0	&&	(last+inode_num)->offset<=seek ){
+		//recalculate seek
+		seek_blocks = (seek-(last+inode_num)->offset)/blocksize;
+		seek_bytes = (seek-(last+inode_num)->offset)%blocksize;
+		current=(last+inode_num)->pag;
+	}
+
+	seek_dif-=seek_blocks;
+        printf("cached page: %lu\n",page2int((last+inode_num)->pag));
+	printf("seek blocks: %lu\n",seek_blocks);
+	// 7. Traverse FAT to starting block
+	uint64_t traversed=0;
+	for (uint64_t i = 0; i < seek_blocks; i++) {
+		printf("going to block %lu\n",page2int(current));
+		current = *(fat + page2int(current));
+		traversed++;
+		if(i==seek_blocks-2){
+			puts("caching entry");
+			(last+inode_num)->pag=current;
+			(last+inode_num)->offset=(seek_dif+traversed)*blocksize;
+		}
+	}
+	uint8_t *buf = (uint8_t*)data;
+	uint64_t bytes_written=0;
+	uint64_t remaining = count;
+	//first block
+	uint64_t to_write = blocksize - seek_bytes;
+	if (to_write > remaining) to_write = remaining;
+	uint64_t result = pwrite(fd, buf + bytes_written, to_write,data_start + page2int(current)*blocksize + seek_bytes);
+	printf("result: %lu\n",result);
+	if (result < 0)
+		return -1;
+	bytes_written += result;
+	remaining -= result;
+	//subsequent blocks
+	while (remaining > 0) {
+		if (page2int(current) == 0xFFFFFFFFFFFF)break;
+		printf("going to block %lu",page2int(current));
+		current = *(fat + page2int(current));
+		to_write = (remaining < blocksize) ? remaining : blocksize;
+
+		result = pwrite(fd, buf + bytes_written, to_write, data_start + page2int(current) * blocksize);
+		if (result <0)return -1;
+		bytes_written += result;
+		remaining -= result;
+	}
+	//munmap(fat, fat_length);
+	return bytes_written;
+}
+
+
+int64_t read_inode(header *a, uint32_t inode_num, inode *inode_struct,  void *data, uint64_t seek, uint64_t count, int fd) {
+	const uint64_t blocksize = 1 << a->blocksize;
+	const uint64_t fat_start = blocksize * (a->resblocks + 1);
+	const uint64_t data_start = blocksize * (a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
+	const uint64_t fat_length = blocksize * a->fatsize;
+
+	if (get_inode(a, inode_num, inode_struct, fd) ==-1) return -1;
+	if(seek >= inode_struct->size)
+		return 0;
+	//clamp
+	if(seek + count > inode_struct->size)
+		count = inode_struct->size - seek;
+	if(!count) return 0;
+
+	uint64_t seek_blocks = seek / blocksize;
+	uint64_t seek_bytes  = seek % blocksize;
+	page current = inode_struct->start;
+	uint64_t seek_dif = seek_blocks;
+	//checking if cache hit:
+	if( page2int((last+inode_num)->pag) != 0	&&	(last+inode_num)->offset<=seek ){
+		//recalculate seek
+		seek_blocks = (seek-(last+inode_num)->offset)/blocksize;
+		seek_bytes = (seek-(last+inode_num)->offset)%blocksize;
+		current=(last+inode_num)->pag;
+	}
+
+	seek_dif-=seek_blocks;
+
+	for (uint64_t i = 0; i < seek_blocks; i++) {
+        	if (page2int(current) == 0xFFFFFFFFFFFF)return -1;
+		current = *(fat + page2int(current));
+	}
+	uint8_t *buf = (uint8_t *)data;
+	uint64_t bytes_read = 0;
+	uint64_t remaining = count;
+
+	// first block
+	uint64_t to_read = blocksize - seek_bytes;
+	if (to_read > remaining) to_read = remaining;
+	uint64_t result = pread(fd, buf + bytes_read, to_read,data_start + page2int(current) * blocksize + seek_bytes);
+    	if (result < 0)return -1;
+	bytes_read += result;
+	remaining -= result;
+	while (remaining > 0) {
+		if (page2int(current) == 0xFFFFFFFFFFFF) break;
+		current = *(fat +page2int(current));
+		to_read = (remaining < blocksize) ? remaining : blocksize;
+		result = pread(fd, buf + bytes_read, to_read , data_start + page2int(current) * blocksize);
+		if (result < 0)return -1;
+		bytes_read += result;
+		remaining -=result;
+		}
+
+//	(last_in_chain+inode_num)->offset=int2page(offset);
+//	(last_in_chain+inode_num)->pag = current;
+   // munmap(fat, fat_length);
+	return bytes_read;
+}
+
+int32_t eval_permissions(header* a, uint32_t inum, uint16_t mask/*3 bits for now*/, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
+
+	//-1 = access denied
+	//0 = allowed
+	if(user==0)
+		return 0; //root bypasses all permissions
+	inode inod;
+	get_inode(a,inum,&inod,fd);
+	//check others first
+	if(((inod.permissions&7)&mask)==mask){
+		puts("permissions satisfied");
+		return 0;
+	}
+	//check user now
+	if(user==inod.user){
+		if((((inod.permissions>>6)&7)&mask)==mask){
+			puts("permissions satisfied");
+			return 0;
+		}
+	}
+	//check groups
+	for(int i=0; i<groupc; i++){
+		if(*(groups+i)==inod.group){
+			if((((inod.permissions>>3)&7)&mask)==mask){
+				puts("permissions satisfied");
+				return 0;
 			}
 		}
 	}
-	*(fat+page2int(current))=int2page(-1);
-	inode_struct.size+=count;
-	ret = inode_struct.size;
-	ret:
-		munmap(fat, fat_length);
-		modify_inode(a, inode_num, &inode_struct, fd);
-		return ret;
+	puts("permission denied");
+	return -1;
 }
 
-int64_t write_inode(header* a, uint32_t inode_num, void* data, uint64_t seek, uint64_t count, int fd){
-        //get inode start (in actual address, not LBA)
-        const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
-        const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
-        const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
-        const uint64_t fat_length = (1<<a->blocksize)*a->fatsize;
-        printf("start of FAT: %lu\nstart of inodes: %lu\n", fat_start, inode_start);
-	inode* inode_struct = malloc(sizeof(inode));
-        if(get_inode(a, inode_num, inode_struct, fd)==-1){
-		puts("nonexistan inode");
-		return -1;
-	}
-        //map FAT to memory
-        page current = inode_struct->start;
-        page* fat = mmap(NULL, fat_length, PROT_READ, MAP_SHARED, fd, fat_start);
-        if (fat == -1) {
- 	               perror("mmap failed");
-               return -1;
-        }
-	if (seek > inode_struct->size){
-		puts("seek out of bounds");
-		return -1;
-	}
-	inode_struct->modified=time(NULL);
-	//clamp size
-	printf("file size: %lu\nseek+count: %lu\n", inode_struct->size, seek+count);
-	if(inode_struct->size < seek+count){
-		printf("extending inode by %lu bytes\n",(seek+count)-inode_struct->size);
-		extend_inode(a, inode_num,(seek+count)-inode_struct->size,fd);
-		inode_struct->size+=(seek+count)-inode_struct->size;
-	}
-        uint64_t seek_blocks = seek>>a->blocksize;
-        uint64_t seek_bytes = seek%(1<<a->blocksize);
-	if(seek_bytes==0&&seek_blocks>0)
-		seek_blocks++;
-        int64_t ret=0;
-	for(uint64_t i = 0; i<seek_blocks; i++){
-		if(page2int(current)==0xFFFFFFFFFFFF){
-			puts("unexpected EOF");
-			ret=-1;
-			goto ret;
-		}
-		current=*(fat+page2int(current));
-		printf("at block %lu/n",page2int(current));
-	}
-	//now skip seek_bytes and write to it
-	uint64_t counter = 0;//should be equal to count in the end
-	uint64_t write_in_block = (1<<a->blocksize)-seek_bytes;
-	if(write_in_block>=count)
-		write_in_block = count;
-	counter+=pwrite(fd, data, write_in_block, data_start + page2int(current)*(1<<a->blocksize) + seek_bytes);
-	if(counter==count){
-		ret=counter;
-		goto ret;
-	}
-	seek_blocks = (count-counter)>>a->blocksize;
-	seek_bytes = (count-counter)%(1<<a->blocksize);
-	for(uint64_t i = 0; i<seek_blocks; i++){
-		if(page2int(current)==0xFFFFFFFFFFFF){
-			puts("unexpected EOF");
-			ret=counter;
-			goto ret;
-		}
-		current=*(fat+page2int(current));
-		counter+=pwrite(fd, data+counter, (1<<a->blocksize), data_start + page2int(current)*(1<<a->blocksize));
-		printf("writing to block %lu/n",page2int(current));
-	}
-	write_in_block = (1<<a->blocksize)-seek_bytes;
-	if(!(count==counter))
-		counter+=pwrite(fd, data+counter, write_in_block, data_start + page2int(current)*(1<<a->blocksize));
-	ret = counter;
-	ret:
-		free(inode_struct);
-		munmap(fat, fat_length);
-		return ret;
-}
-
-int64_t read_inode(header* a, uint32_t inode_num, inode* inode_struct, void* data, uint64_t seek, uint64_t count, int fd){
-	//get inode start (in actual address, not LBA)
-	const uint64_t inode_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + 1);
-	const uint64_t fat_start = (1<<a->blocksize)*(a->resblocks + 1);
-	const uint64_t data_start = (1<<a->blocksize)*(a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
-	const uint64_t fat_length = (1<<a->blocksize)*a->fatsize;
-	//printf("address of data: %lu\n", (size_t)data);
-	//seek for inode
-	if(get_inode(a, inode_num, inode_struct, fd)==-1){
-		puts("nonexistan inode");
-		return -1;
-	}
-	//map FAT to memory
-	page current = inode_struct->start;
-	page* fat = (page*)mmap(NULL, fat_length, PROT_READ, MAP_SHARED, fd, fat_start);
-	if (fat == -1) {
-        	perror("mmap failed");
-        	return -1;
-    	}
-	uint64_t seek_blocks = seek>>a->blocksize;
-	uint64_t seek_bytes = seek%(1<<a->blocksize);
-	int64_t ret=0;
-	if(seek>=inode_struct->size){
-		puts("seek out of bounds");
-		printf("seek: %lu\nsize: %lu",seek,inode_struct->size);
-		ret=-1;
-		goto ret;
-	}
-	if(seek+count>inode_struct->size)
-		count=(count<<1)+seek-inode_struct->size;
-	//unwind the FAT until seek_block is reached
-	for(uint64_t i = 0; i<seek_blocks; i++){
-		if(page2int(current)==0xFFFFFFFFFFFF){
-			puts("unexpected EOF");
-			ret=-1;
-			goto ret;
-		}
-		current=*(fat+page2int(current));
-		printf("at block %lu/n",page2int(current));
-	}
-	//now skip seek_bytes and read from it
-	uint64_t counter = 0;//should be equal to count in the end
-	uint64_t read_in_block = (1<<a->blocksize)-seek_bytes;
-	if(read_in_block>=count)
-		read_in_block = count;
-	counter+=pread(fd, data, read_in_block, data_start + page2int(current)*(1<<a->blocksize) + seek_bytes);
-	if(counter==count){
-		ret=counter;
-		goto ret;
-	}
-	seek_blocks = (count-counter)>>a->blocksize;
-	seek_bytes = (count-counter)%(1<<a->blocksize);
-	for(uint64_t i = 0; i<seek_blocks; i++){
-		if(page2int(current)==0xFFFFFFFFFFFF){
-			puts("unexpected EOF");
-			ret=counter;
-			goto ret;
-		}
-		current=*(fat+page2int(current));
-		counter+=pread(fd, data+counter, (1<<a->blocksize), data_start + page2int(current)*(1<<a->blocksize));
-		printf("reading block %lu/n",page2int(current));
-	}
-	read_in_block = (1<<a->blocksize)-seek_bytes;
-	current=*(fat+page2int(current));
-	if(page2int(current)==0xFFFFFFFFFFFF){
-		puts("warning: malformed FAT");
-	}
-	if(!(count==counter))
-		counter+=pread(fd, data+counter, read_in_block, data_start + page2int(current)*(1<<a->blocksize));
-	ret = counter;
-	ret:
-		munmap(fat, fat_length);
-		return ret;
-}
-
-uint64_t path2inode (header* a, char* p, int fd){
+uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
 	//returnes a inode based on the path
 	char* path = calloc(4096,1);
-	char** pathv = calloc(128,8);
+	char** pathv = calloc(1024,8);
 	strcpy(path,p);
 	int pathix=0;
 	for(int i = 0; i<4096; i++){
@@ -488,10 +546,13 @@ uint64_t path2inode (header* a, char* p, int fd){
 			*(pathv+pathix++)=(char*)path+i+1;
 		}
 	}
+	printf("path: ");
+	write(0,path+1,4095);
+	puts("");
 	inode directory;
 	get_inode(a,0,&directory,fd);
-	file* dir=calloc(directory.size/128,128);
-	file dirstruct;
+	file* dir=malloc(directory.size);
+	file dirstruct={"/",1,0};
 	read_inode(a,0,&directory,dir,0,directory.size,fd);
 	printf("size of root directory: %lu\n", directory.size);
 	for(int i=0; i<pathix; i++){
@@ -512,11 +573,22 @@ uint64_t path2inode (header* a, char* p, int fd){
 		return -1; //no such file or directory
 		found:
 		free(dir);
-		//if it is a directory, continue, if it is a file return -2 if i!=pathix-1
-		if((dirstruct.attributes&1)==1){
+		//stop at symlink
+		if(dirstruct.attributes==2){
+			//safe to break
+			free(path);
+			free(pathv);
+			break;
+		}
+		if(dirstruct.attributes==1){
 			//directory
 			get_inode(a,dirstruct.inode,&directory,fd);
-			dir=calloc(directory.size/128,128);
+			dir=malloc(directory.size+1);
+			//check execute bit
+			if (eval_permissions(a,dirstruct.inode, 01, user, groups, groupc, fd)){
+				puts("permission denied");
+				return -2;
+			}
 			read_inode(a,dirstruct.inode,&directory,dir,0,directory.size,fd);
 		}
 		else{
@@ -524,9 +596,299 @@ uint64_t path2inode (header* a, char* p, int fd){
 				free(path);
 				free(pathv);
 				puts("not a directory");
+				return -1;
+			}
+		}
+	}
+	inode inod;
+	get_inode(a,dirstruct.inode,&inod,fd);
+	printf("inode: %d, links %d\n",dirstruct.inode,inod.links);
+	return dirstruct.inode|((uint64_t)dirstruct.attributes<<32);
+}
+
+int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
+	//find the last entry
+	char* path = calloc(4096,1);
+	strcpy(path,p);
+	uint16_t last_slash_pos = 0;
+	for (int i = 0; i<4096&&*path; i++){
+		if(*(path+i)=='/')
+			last_slash_pos = i;
+	}
+	*(path+last_slash_pos)=0;
+	puts(path+last_slash_pos+1);
+	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
+	if(inum==-1||inum==-2)
+		return -1;
+	if(inum>>32==0){
+		puts("not a directory");
+		return -2;
+	}
+	if(inum>>32==2){
+		puts("refusing to follow symlink");
+		return -1;
+	}
+	inode inod;
+	get_inode(a, inum, &inod, fd);
+	//check permissions (r, w and x)
+	if(eval_permissions(a,inum, 07, user, groups, groupc, fd)){
+		puts("permission denied");
+		return -1;
+	}
+	//check if file already exists
+	file* dir=calloc(inod.size/128,128);
+	read_inode(a, inum, &inod, dir, 0, inod.size, fd);
+	int free_slot=-1;
+	for(int i=0; i<inod.size/128; i++){
+		if(*((char*)(dir+i))==0){
+			free_slot=i;
+			continue;
+		}
+		else{
+			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
+				puts("name already taken");
+				return -1;
+			}
+		}
+	}
+	inode new_inode={permissions,user,*groups,0,0,0,0,0,{0,0}};
+	uint32_t new_inum = create_new_inode(a,&new_inode,fd);
+	if(new_inum==-1){
+		puts("error making inode");
+		return -3;
+	}
+	printf("new inode: %d\n", new_inum);
+	file new_file={" ",0,new_inum};
+	strcpy(new_file.name, path+last_slash_pos+1);
+	if(free_slot==-1)
+		//write after
+		write_inode(a,inum,&new_file,inod.size,128,fd);
+	else
+		write_inode(a,inum,&new_file,128*free_slot,128,fd);
+	return new_inum;
+}
+
+int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
+	//find the last entry
+	char* path = calloc(4096,1);
+	strcpy(path,p);
+	uint16_t last_slash_pos = 0;
+	for (int i = 0; i<4096&&*path; i++){
+		if(*(path+i)=='/')
+			last_slash_pos = i;
+	}
+	*(path+last_slash_pos)=0;
+	puts(path+last_slash_pos+1);
+	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
+	if(inum==-1||inum==-2)
+		return -1;
+	if(inum>>32==0){
+		puts("not a directory");
+		return -1;
+	}
+	if(inum>>32==2){
+		puts("refusing to follow symlink");
+		return -1;
+	}
+	inode inod;
+	get_inode(a, inum, &inod, fd);
+	//check permissions (r, w and x)
+	if(eval_permissions(a,inum, 07, user, groups, groupc, fd)){
+		puts("permission denied");
+		return -1;
+	}
+	//check if file already exists
+	file* dir=calloc(inod.size/128,128);
+	read_inode(a, inum, &inod, dir, 0, inod.size, fd);
+	int free_slot=-1;
+	for(int i=0; i<inod.size/128; i++){
+		if(*((char*)(dir+i))==0){
+			free_slot=i;
+			continue;
+		}
+		else{
+			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
+				puts("name already taken");
 				return -2;
 			}
 		}
 	}
-	return dirstruct.inode;
+	inod.links=inod.links+1; //to include ..
+	modify_inode(a,inum,&inod,fd);
+	free(dir);
+	inode new_inode={permissions,user,*groups,0,0,0,0,0,{0,0}};
+	uint32_t new_inum = create_new_inode(a,&new_inode,fd);
+	new_inode.links=2;
+	modify_inode(a,new_inum,&new_inode,fd);
+	if(new_inum==-1){
+		puts("error making inode");
+		return -1;
+	}
+	printf("new inode: %d\n", new_inum);
+	file new_file={" ",1,new_inum};
+	strcpy(new_file.name, path+last_slash_pos+1);
+	free(path);
+	if(free_slot==-1)
+		//write after
+		write_inode(a,inum,&new_file,inod.size,128,fd);
+	else
+		write_inode(a,inum,&new_file,128*free_slot,128,fd);
+	//make . and ..
+	dir=calloc(256,1);
+	*(dir+0)=(file){".",1,new_inum};
+	*(dir+1)=(file){"..",1,inum};
+	write_inode(a, new_inum, dir, 0, 256, fd);
+	return new_inum;
 }
+
+
+int64_t create_symlink(header* a, char* p, char* dest, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
+	//find the last entry
+	char* path = calloc(4096,1);
+	strcpy(path,p);
+	uint16_t last_slash_pos = 0;
+	for (int i = 0; i<4096&&*path; i++){
+		if(*(path+i)=='/')
+			last_slash_pos = i;
+	}
+	*(path+last_slash_pos)=0;
+	puts(path+last_slash_pos+1);
+	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
+	if(inum==-1||inum==-2)
+		return -1;
+	if(inum>>32==0){
+		puts("not a directory");
+		return -2;
+	}
+	if(inum>>32==2){
+		puts("refusing to follow symlink");
+		return -1;
+	}
+	inode inod;
+	get_inode(a, inum, &inod, fd);
+	//check permissions (r, w and x)
+	if(eval_permissions(a,inum, 07, user, groups, groupc, fd)){
+		puts("permission denied");
+		return -1;
+	}
+	//check if file already exists
+	file* dir=calloc(inod.size/128,128);
+	read_inode(a, inum, &inod, dir, 0, inod.size, fd);
+	int free_slot=-1;
+	for(int i=0; i<inod.size/128; i++){
+		if(*((char*)(dir+i))==0){
+			free_slot=i;
+			continue;
+		}
+		else{
+			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
+				puts("name already taken");
+				return -1;
+			}
+		}
+	}
+	inode new_inode={0777,user,*groups,0,0,0,0,0,{0,0}};
+	uint32_t new_inum = create_new_inode(a,&new_inode,fd);
+	if(new_inum==-1){
+		puts("error making inode");
+		return -3;
+	}
+	printf("new inode: %d\n", new_inum);
+	//calculate size of target
+	uint64_t siz=0;
+	for(siz = 0; siz<4096; siz++)
+		if(!*(dest+siz))
+			break;
+
+	write_inode(a,new_inum,dest,0,siz,fd);
+	file new_file={" ",2,new_inum};
+	strcpy(new_file.name, path+last_slash_pos+1);
+	if(free_slot==-1)
+		//write after
+		write_inode(a,inum,&new_file,inod.size,128,fd);
+	else
+		write_inode(a,inum,&new_file,128*free_slot,128,fd);
+	return new_inum;
+}
+
+uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
+	//deletes directory entry and decrements link count
+	char* path = calloc(4096,1);
+	strcpy(path,p);
+	uint16_t last_slash_pos = 0;
+	for (int i = 0; i<4096&&*path; i++){
+		if(*(path+i)=='/')
+			last_slash_pos = i;
+	}
+	*(path+last_slash_pos)=0;
+	puts(path+last_slash_pos+1);
+	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
+	if(inum==-1)
+		return -1;
+	if(inum==-2)
+		return -2;
+	if(inum>>32==0){
+		puts("not a directory");
+		return -1;
+	}
+	if(inum>>32==2){
+		puts("refusing to follow symlink");
+		return -1;
+	}
+	inode inod;
+	get_inode(a, inum, &inod, fd);
+	//check permissions of parent (r, w and x)
+	if(eval_permissions(a,inum, 07, user, groups, groupc, fd)){
+		puts("unlink: permission denied");
+		return -2;
+	}
+	//check if file  exists
+	file* dir=calloc(inod.size/128,128);
+	read_inode(a, inum, &inod, dir, 0, inod.size, fd);
+	int free_slot=-1;
+	int ix=0;
+	for(int i=0; i<inod.size/128; i++){
+		if(*((char*)(dir+i))==0){
+			free_slot=i;
+			continue;
+		}
+		else{
+			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
+				ix=i;
+				goto success;
+			}
+		}
+	}
+	puts("no such file or directory");
+	return -1;
+	free(dir);
+	free(path);
+	success:
+	//delete entry and decrement link count
+	puts("deleting entry");
+	file deleted={"\0",0,0};
+	inode del;
+	printf("inode of %s: %d\n", path, inum);
+	get_inode(a,(dir+ix)->inode,&del,fd);
+	if(del.links==1)
+		delete_inode(a,(dir+ix)->inode,fd);
+	else{
+		del.links=del.links-1;
+		modify_inode(a,(dir+ix)->inode,&del,fd);
+	}
+	free(dir);
+	free(path);
+	if(inum==0){
+		puts("trying to delete root, ignoring request");
+	}
+	else write_inode(a,inum,&deleted,ix*128,128,fd);
+	if(ix==inod.size/128-1){ //if the file struct 
+		printf("size of inode: %d\n",inod.size);
+		if(inum==0){
+			puts("trying to delete root, ignoring request");
+		}
+		else shrink_inode(a,inum,128,fd);
+	}
+	return del.links;
+}
+
