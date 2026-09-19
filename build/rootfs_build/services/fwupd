@@ -1,0 +1,6 @@
+#!/bin/sh
+for daemon in /usr/libexec/fwupd /usr/lib/fwupd/fwupd /usr/sbin/fwupd; do
+    if [ -x "$daemon" ]; then exec "$daemon" --verbose; fi
+done
+echo "fwupd: daemon not found" >&2
+exit 1
