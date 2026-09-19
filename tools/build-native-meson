@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+
+[ "$#" -ge 4 ] || {
+    echo "usage: build-native-meson <source-dir> <output.yspkg> <name> <version> [description]" >&2
+    exit 2
+}
+
+DIR=$1
+OUT=$2
+NAME=$3
+VERSION=$4
+DESCRIPTION="${5:-Native Obsidian Core Linux package}"
+PREFIX="${PREFIX:-/usr}"
+ABI="${YSPM_ABI:-yspm-abi-1}"
+ARCH="${ARCH:-x86_64}"
+YSPM_BIN="${YSPM_BIN:-yspm}"
+
+[ -d "$DIR" ] || { echo "source directory not found: $DIR" >&2; exit 1; }
+command -v meson >/dev/null 2>&1 || { echo "meson is required" >&2; exit 1; }
+command -v ninja >/dev/null 2>&1 || { echo "ninja is required" >&2; exit 1; }
+command -v "$YSPM_BIN" >/dev/null 2>&1 || { echo "yspm is required" >&2; exit 1; }
+
+STAGE=$(mktemp -d)
+trap 'rm -rf "$STAGE"' EXIT INT TERM
+
+cd "$DIR"
+rm -rf build
+meson setup build --prefix="$PREFIX" -Dman=false
+ninja -C build
+DESTDIR="$STAGE" meson install -C build
+
+"$YSPM_BIN" build   --root "$STAGE"   --output "$OUT"   --name "$NAME"   --version "$VERSION"   --description "$DESCRIPTION"   --abi "$ABI"   --arch "$ARCH"   --license "${LICENSE:-GPL-2.0-or-later}"
+
+echo "$OUT"
