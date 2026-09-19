@@ -91,9 +91,10 @@ cp "$REPO_DIR/tools/hc-installer" "$ROOTFS/usr/sbin/hc-installer"
 cp "$REPO_DIR/tools/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-desktop"
 cp "$REPO_DIR/tools/hc-setup-gnome" "$ROOTFS/usr/sbin/hc-setup-gnome"
 cp "$REPO_DIR/tools/hc-doctor" "$ROOTFS/usr/bin/hc-doctor"
+cp "$REPO_DIR/tools/hc-recovery" "$ROOTFS/usr/bin/hc-recovery"
 cp "$REPO_DIR/tools/obsidian-first-login" "$ROOTFS/usr/bin/obsidian-first-login"
 cp "$REPO_DIR/tools/bench-system" "$ROOTFS/usr/bin/hc-bench"
-chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-gnome" "$ROOTFS/usr/bin/hc-doctor" "$ROOTFS/usr/bin/obsidian-first-login" "$ROOTFS/usr/bin/hc-bench"
+chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-gnome" "$ROOTFS/usr/bin/hc-doctor" "$ROOTFS/usr/bin/hc-recovery" "$ROOTFS/usr/bin/obsidian-first-login" "$ROOTFS/usr/bin/hc-bench"
 
 mkdir -p "$ROOTFS/etc/ssl/certs"
 if command -v wget >/dev/null 2>&1; then
