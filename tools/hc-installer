@@ -25,6 +25,13 @@ yesno() {
         printf 'Please answer y or n.\n'
     done
 }
+confirm_disk() {
+    disk="$1"
+    printf '\n%s\n' "Final safety check: this will erase $disk."
+    printf '%s\n' "Type ERASE $disk exactly to continue:"
+    IFS= read -r confirmation || true
+    [ "$confirmation" = "ERASE $disk" ] || die "disk erase confirmation did not match; installation cancelled"
+}
 
 [ "$(id -u)" = 0 ] || die "run this installer as root"
 need tar
@@ -61,7 +68,8 @@ case "$MODE" in
 
         printf '%s\n' 'Selected target:'
         lsblk -dn -o NAME,SIZE,MODEL,TRAN,RO "$DISK"
-        yesno "ERASE AND REPARTITION $DISK?" "n" || die "installation cancelled"
+        confirm_disk "$DISK"
+
         printf '%s\n' 'Writing a GPT layout: 512 MiB EFI + remaining space for Linux...'
         printf 'o\ny\nn\n1\n\n+512M\nEF00\nn\n2\n\n\n8300\nw\ny\n' | gdisk "$DISK"
         case "$DISK" in
@@ -80,7 +88,7 @@ case "$MODE" in
         if yesno "Format the root partition as ext4?" "n"; then
             mkfs.ext4 -F "$ROOT"
         fi
-        ;;
+        ;?;
     *) die "unknown installation mode" ;;
 esac
 
@@ -91,7 +99,7 @@ KERNEL=$(ask 'Path to kernel image' '/boot/vmlinuz')
 
 HOSTNAME=$(ask 'Hostname' 'hardcore')
 USERNAME=$(ask 'Username' 'user')
-YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json')
+YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json')
 BOOTLOADER=$(ask 'Bootloader (grub/systemd-boot)' 'grub')
 
 case "$USERNAME" in
