@@ -45,19 +45,19 @@ printf '\n'
 MODE=$(ask 'Installation mode (guided/manual)' 'guided')
 case "$MODE" in
     guided)
-        need sfdisk
-        need mkfs.fat
+        need gdisk
+        need mkfs.vfat
         DISK=$(ask 'Target disk, e.g. /dev/sda')
         [ -b "$DISK" ] || die "not a block device: $DISK"
         yesno "ERASE AND REPARTITION $DISK?" "n" || die "installation cancelled"
         printf '%s\n' 'Writing a GPT layout: 512 MiB EFI + remaining space for Linux...'
-        printf 'label: gpt\nsize=512M, type=U\nsize=0, type=L\n' | sfdisk "$DISK"
+        printf 'o\ny\nn\n1\n\n+512M\nEF00\nn\n2\n\n\n8300\nw\ny\n' | gdisk "$DISK"
         case "$DISK" in
             *nvme*|*mmcblk*) ESP="${DISK}p1"; ROOT="${DISK}p2" ;;
             *) ESP="${DISK}1"; ROOT="${DISK}2" ;;
         esac
         sleep 1
-        mkfs.fat -F 32 "$ESP"
+        mkfs.vfat -F 32 "$ESP"
         mkfs.ext4 -F "$ROOT"
         ;;
     manual)
