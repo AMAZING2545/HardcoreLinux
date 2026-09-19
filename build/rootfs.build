@@ -97,9 +97,12 @@ cp "$REPO_DIR/tools/bench-system" "$ROOTFS/usr/bin/hc-bench"
 chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-gnome" "$ROOTFS/usr/bin/hc-doctor" "$ROOTFS/usr/bin/hc-recovery" "$ROOTFS/usr/bin/obsidian-first-login" "$ROOTFS/usr/bin/hc-bench"
 
 mkdir -p "$ROOTFS/etc/ssl/certs"
-if command -v wget >/dev/null 2>&1; then
-    wget -q https://curl.se/ca/cacert.pem -O "$ROOTFS/etc/ssl/certs/ca-certificates.crt" || true
-fi
+for ca_bundle in     /etc/ssl/certs/ca-certificates.crt     /etc/ssl/certs/ca-bundle.crt     /etc/static/ssl/certs/ca-bundle.crt; do
+    if [ -f "$ca_bundle" ]; then
+        cp "$ca_bundle" "$ROOTFS/etc/ssl/certs/ca-certificates.crt"
+        break
+    fi
+done
 
 mkdir -p "$ROOTFS/home" "$ROOTFS/root" "$ROOTFS/tmp"
 mkdir -p "$ROOTFS/etc/xdg/autostart"
