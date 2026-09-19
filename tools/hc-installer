@@ -36,7 +36,7 @@ need chroot
 need mkfs.ext4
 
 printf '\033c'
-printf '%s\n' 'Hardcore Linux installer'
+printf '%s\n' 'Obsidian Core Linux installer'
 printf '%s\n\n' 'This installer is intentionally small. Review every value before writing a disk.'
 printf '%s\n' 'Detected disks:'
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
@@ -79,7 +79,7 @@ KERNEL=$(ask 'Path to kernel image' '/boot/vmlinuz')
 
 HOSTNAME=$(ask 'Hostname' 'hardcore')
 USERNAME=$(ask 'Username' 'user')
-YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json')
+YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json')
 BOOTLOADER=$(ask 'Bootloader (grub/systemd-boot)' 'grub')
 
 case "$USERNAME" in
@@ -140,7 +140,7 @@ EOF
 chmod 0440 "$TARGET/etc/sudoers.d/10-wheel"
 
 cat > "$TARGET/etc/motd" <<'EOF'
-Hardcore Linux
+Obsidian Core Linux
 GNOME desktop setup:
   sudo /usr/sbin/hc-setup-desktop
 
@@ -152,12 +152,12 @@ EOF
 case "$BOOTLOADER" in
     grub)
         need grub-install
-        grub-install --target=x86_64-efi --efi-directory="$TARGET/boot/efi" --bootloader-id=HardcoreLinux --boot-directory="$TARGET/boot" --removable --recheck --no-nvram
+        grub-install --target=x86_64-efi --efi-directory="$TARGET/boot/efi" --bootloader-id=ObsidianCoreLinux --boot-directory="$TARGET/boot" --removable --recheck --no-nvram
         mkdir -p "$TARGET/boot/grub"
         cat > "$TARGET/boot/grub/grub.cfg" <<EOF
 search --no-floppy --fs-uuid --set=root $ROOT_UUID
 set timeout=3
-menuentry 'Hardcore Linux' {
+menuentry 'Obsidian Core Linux' {
     linux /boot/vmlinuz root=UUID=$ROOT_UUID rw init=/etc/init
 }
 EOF
@@ -172,7 +172,7 @@ timeout 3
 editor no
 EOF
         cat > "$TARGET/boot/efi/loader/entries/hardcore.conf" <<EOF
-title Hardcore Linux
+title Obsidian Core Linux
 linux /boot/vmlinuz
 options root=UUID=$ROOT_UUID rw init=/etc/init
 EOF
