@@ -3,7 +3,6 @@ set -eu
 
 die() { printf 'hc-setup-desktop: %s\n' "$*" >&2; exit 1; }
 [ "$(id -u)" = 0 ] || die "run as root"
-
 command -v yspm >/dev/null 2>&1 || die "yspm is not installed"
 command -v initctl >/dev/null 2>&1 || true
 
@@ -45,20 +44,32 @@ case "${answer:-y}" in
     *) USE_IWD=1 ;;
 esac
 
-packages="udev dbus $WM_PACKAGES"
-[ "$USE_LY" = 1 ] && packages="$packages ly"
-[ "$USE_AUDIO" = 1 ] && packages="$packages pipewire wireplumber"
-[ "$USE_IWD" = 1 ] && packages="$packages iwd"
-
-printf '%s\n\n' "Installing: $packages"
 yspm update
-if ! yspm install $packages --yes; then
-    printf '%s\n' 'One or more optional desktop packages are not available in the configured binary repository yet.'
-    printf '%s\n' 'Core packages already present can still be configured; re-run this script after the repository is updated.'
+
+install_package() {
+    package="$1"
+    printf 'Installing %s...\n' "$package"
+    if yspm install "$package" --yes; then
+        printf '%s\n' "  [ ok ] $package"
+    else
+        printf '%s\n' "  [ warn ] package unavailable: $package"
+    fi
+}
+
+install_package udev
+install_package dbus
+for package in $WM_PACKAGES; do
+    install_package "$package"
+done
+[ "$USE_LY" = 1 ] && install_package ly
+if [ "$USE_AUDIO" = 1 ]; then
+    install_package pipewire
+    install_package wireplumber
 fi
+[ "$USE_IWD" = 1 ] && install_package iwd
 
 mkdir -p /etc/profile.d /etc/sway /etc/labwc /etc/iwd /system/services /system/tmp
-printf '%s\n' '1' > /system/tmp/services
+: > /system/tmp/services
 
 cat > /etc/profile.d/20-desktop.sh <<'EOF'
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -77,20 +88,13 @@ fi
 EOF
 chmod 0644 /etc/profile.d/20-desktop.sh
 
-cat > /etc/system/services/iwd <<'EOF'
+cat > /system/services/iwd <<'EOF'
 #!/bin/sh
 exec iwd -d
 EOF
-chmod 0755 /etc/system/services/iwd 2>/dev/null || true
-if [ -d /system/services ]; then
-    cat > /system/services/iwd <<'EOF'
-#!/bin/sh
-exec iwd -d
-EOF
-    chmod 0755 /system/services/iwd
-fi
+chmod 0755 /system/services/iwd
 
-cat > /etc/sway/config <<EOF
+cat > /etc/sway/config <<'EOF'
 set $mod Mod4
 font pango:monospace 10
 exec_always sh -c 'command -v waybar >/dev/null && waybar'
@@ -116,9 +120,9 @@ IWD=$USE_IWD
 EOF
 
 if [ "$USE_IWD" = 1 ] && command -v initctl >/dev/null 2>&1; then
-    initctl start iwd || true
+    initctl enable iwd || true
 fi
 
-printf '\n%s\n' "Desktop setup finished."
+printf '\n%s\n' 'Desktop setup finished.'
 printf '%s\n' "Selected WM: $WM"
-printf '%s\n' 'Run the selected session from the login manager or tty.'
+printf '%s\n' 'Re-login or reboot to let the desktop/session configuration take effect.'
