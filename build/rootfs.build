@@ -10,6 +10,7 @@ BUILD_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 REPO_DIR=$(CDPATH= cd -- "$BUILD_DIR/.." && pwd)
 ROOTFS="${ROOTFS:-$BUILD_DIR/rootfs}"
 OUTPUT="${OUTPUT:-$BUILD_DIR/rootfs.tar}"
+DISTRO_VERSION="${DISTRO_VERSION:-0.3.0}"
 
 extract_if_present() {
     archive="$1"
@@ -25,7 +26,6 @@ rm -rf "$ROOTFS"
 rm -f "$OUTPUT"
 mkdir -p "$ROOTFS"
 
-# Bootstrap the core userspace from the repository's existing artifacts.
 for archive in \
     devmusl.tar musl.tar devlinux.tar terminfo.tar openssl.tar busybox.tar \
     ncurses6.tar zlib.tar devncurses6.tar libalsa.tar alsautils.tar \
@@ -44,23 +44,20 @@ mkdir -p "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/driv
 mkdir -p "$ROOTFS/system/tmp" "$ROOTFS/var/lib/yspm" "$ROOTFS/var/cache/yspm"
 mkdir -p "$ROOTFS/etc/yspm" "$ROOTFS/etc/profile.d" "$ROOTFS/run/user"
 
-# Native init/service tooling.
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
 cp "$BUILD_DIR/rootfs_build/initctl" "$ROOTFS/sbin/initctl"
 cp "$BUILD_DIR/rootfs_build/scripts/." "$ROOTFS/system/scripts/"
 if [ -d "$BUILD_DIR/rootfs_build/services" ]; then
-    cp "$BUILD_DIR/rootfs_build/services/." "$ROOTFS/system/services/"
+    cp -a "$BUILD_DIR/rootfs_build/services/." "$ROOTFS/system/services/"
 fi
 if [ -d "$BUILD_DIR/rootfs_build/drivers" ]; then
-    cp "$BUILD_DIR/rootfs_build/drivers/." "$ROOTFS/system/drivers/"
+    cp -a "$BUILD_DIR/rootfs_build/drivers/." "$ROOTFS/system/drivers/"
 fi
 chmod 0755 "$ROOTFS/etc/init" "$ROOTFS/sbin/initctl"
-find "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers" -type f -exec chmod 0755 {} \; 2>/dev/null || true
+find "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers" -type f -exec chmod 0755 {} ; 2>/dev/null || true
 printf '%s\n' 'dbus' > "$ROOTFS/system/enabled-services"
 : > "$ROOTFS/system/tmp/services"
 
-# yspm is the distro package manager. The distro intentionally does not ship
-# a second package-management implementation.
 if [ -n "${YSPM_BIN:-}" ]; then
     test -f "$YSPM_BIN" || {
         echo "rootfs.build: YSPM_BIN does not exist: $YSPM_BIN" >&2
@@ -75,20 +72,16 @@ else
 fi
 chmod 0755 "$ROOTFS/usr/bin/yspm"
 
-# Install the distro's interactive tools.
 cp "$REPO_DIR/tools/hc-installer" "$ROOTFS/usr/sbin/hc-installer"
 cp "$REPO_DIR/tools/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-desktop"
 cp "$REPO_DIR/tools/bench-system" "$ROOTFS/usr/bin/hc-bench"
 chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/bin/hc-bench"
 
-# HTTPS CA certificates.
 mkdir -p "$ROOTFS/etc/ssl/certs"
 if command -v wget >/dev/null 2>&1; then
     wget -q https://curl.se/ca/cacert.pem -O "$ROOTFS/etc/ssl/certs/ca-certificates.crt" || true
 fi
 
-# Minimal account database. The live image deliberately exposes an installer
-# shell on tty1; the installer sets real passwords before rebooting.
 mkdir -p "$ROOTFS/home" "$ROOTFS/root" "$ROOTFS/tmp"
 printf '%s\n' 'root:x:0:0:root:/root:/bin/sh' > "$ROOTFS/etc/passwd"
 printf '%s\n' 'root:x:0:' > "$ROOTFS/etc/group"
@@ -118,12 +111,12 @@ export YSPM_DATA_DIR='/var/lib/yspm'
 export YSPM_CACHE_DIR='/var/cache/yspm'
 EOF
 
-cat > "$ROOTFS/etc/os-release" <<'EOF'
+cat > "$ROOTFS/etc/os-release" <<EOF
 NAME="Hardcore Linux"
-VERSION="0.3.0"
+VERSION="$DISTRO_VERSION"
 ID=hardcore
 ID_LIKE=alpine
-PRETTY_NAME="Hardcore Linux 0.3.0"
+PRETTY_NAME="Hardcore Linux $DISTRO_VERSION"
 ANSI_COLOR="36"
 HOME_URL="https://github.com/Yassine-Jemi01/HardcoreLinux"
 BUG_REPORT_URL="https://github.com/Yassine-Jemi01/HardcoreLinux/issues"
@@ -131,7 +124,5 @@ EOF
 
 : > "$ROOTFS/etc/hc-live"
 
-# Let the init system choose a safe tty1 live shell. Installed systems remove
-# this marker in the installer.
 tar -cpzf "$OUTPUT" -C "$ROOTFS" .
 echo "root filesystem: $OUTPUT"
