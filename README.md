@@ -1,308 +1,136 @@
-# Hardcore Linux
+# Obsidian Core Linux
 
-A small, independent Linux distribution built around musl, BusyBox, a shell-based init system, and yspm.
+Obsidian Core Linux is an independent Linux distribution project built around musl, BusyBox, a small native init/service layer, and yspm.
 
 ## Project direction
 
-Hardcore Linux aims to stay minimal without turning the base system into an unusable proof of concept.
+Obsidian Core Linux aims to be a complete general-purpose desktop distribution rather than only a bootstrap environment.
 
-The base system is intentionally small. Graphical environments and larger applications are installed later from the yspm repository.
+The default desktop is GNOME. The system keeps a lightweight fallback profile for lower-resource machines.
 
 The project uses:
 
 - musl libc
 - BusyBox
-- a small shell init system
-- service scripts under /system
-- yspm for native package management
-- UEFI boot support
-- Sway as the primary desktop path
-- labwc as an alternative desktop path
+- a small auditable init and service layer
+- yspm as the only package manager
+- UEFI x86_64 boot support
+- GNOME as the default desktop
+- GDM as the preferred graphical login manager
+- PipeWire and WirePlumber
+- NetworkManager
+- Bluetooth support
+- a native .yspkg repository
 
-## Current development foundation
+## Current development line
 
-The current development line adds the pieces needed for a usable distribution:
+The current development work covers:
 
 - interactive installer
 - guided GPT or manual partitioning
-- GRUB and systemd-boot installation paths when their tools are available
-- hostname and user configuration
-- automated desktop setup
-- Sway and labwc
-- optional Ly display manager
-- PipeWire and WirePlumber integration
-- iwd wireless service
-- D-Bus service
-- architecture-independent network bootstrap
-- native .yspkg package recipes
-- yspm bootstrap integration
-- legacy package migration into a native yspm repository
-- release SHA-256 checksums
-- automated release image builds
-- reproducible benchmark methodology
-- installation, desktop, and troubleshooting documentation
+- root and user account creation
+- filesystem and bootloader setup
+- native yspm bootstrap
+- GNOME desktop profile
+- graphical login integration
+- audio, network, Bluetooth and desktop portal foundations
+- live ISO generation
+- UEFI disk image generation
+- native package build recipes
+- legacy package migration
+- repository indexes and checksums
+- CI validation and tagged releases
+- installation and troubleshooting documentation
 
 ## yspm
 
-yspm is the package manager used by the distribution.
+yspm is the only package manager used by the distribution.
 
-The base image contains:
-
-~~~text
-/usr/bin/yspm
-/etc/yspm/env
-/etc/profile.d/yspm.sh
-/var/lib/yspm
-/var/cache/yspm
-~~~
-
-After installation:
+Typical commands:
 
 ~~~bash
 sudo yspm update
+sudo yspm search gnome
 sudo yspm install gnome-shell
 sudo yspm upgrade
 ~~~
 
 The distribution does not maintain a second package manager.
 
-The existing tar archive repository is still kept during the migration to native yspkg packages. The release workflow converts legacy packages, builds a yspm index, and publishes native packages with each release.
+## Build
 
-## Build the root filesystem
-
-The bootstrap archives currently live under repo/.
-
-Build the yspm binary:
+Build yspm:
 
 ~~~bash
 sh tools/build-yspm
 ~~~
 
-Then build the root filesystem:
+Build the root filesystem:
 
 ~~~bash
 sudo env YSPM_BIN=/tmp/yspm YSPM_ARCHIVE_DIR="$PWD/repo" sh build/rootfs.build
 ~~~
 
-Output:
-
-~~~text
-build/rootfs.tar
-~~~
-
-The rootfs builder no longer installs the old flashman package manager.
-
-## Build a bootable image
-
-Extract a kernel from the repository's standalone kernel archive:
-
-~~~bash
-sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
-~~~
-
 Build a UEFI disk image:
 
 ~~~bash
-sudo sh tools/build-image \
-  build/rootfs.tar \
-  /tmp/vmlinuz \
-  HardcoreLinux.img \
-  2G
+sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
+sudo sh tools/build-image build/rootfs.tar /tmp/vmlinuz ObsidianCoreLinux.img 2G
 ~~~
-
-The image contains the root filesystem, kernel, GRUB boot files, and a copy of rootfs.tar so it can act as an installer environment.
 
 Build a live ISO:
 
 ~~~bash
-sudo sh tools/build-iso \
-  build/rootfs.tar \
-  /tmp/vmlinuz \
-  HardcoreLinux.iso
+sudo sh tools/build-iso build/rootfs.tar /tmp/vmlinuz ObsidianCoreLinux.iso
 ~~~
 
-The ISO boots a live Hardcore Linux environment directly from an initramfs and starts the installer on tty1.
+## Installation
 
-## Install
+Boot the live ISO in UEFI x86_64 mode.
 
-Boot the image on a UEFI x86_64 machine and run:
+The live environment launches the interactive installer on tty1. It supports guided GPT partitioning or manual partitions, configures the first user, writes filesystem mounts, installs the bootloader, and removes the live-only marker from the installed system.
 
-~~~bash
-sh /usr/sbin/hc-installer
-~~~
+See docs/INSTALL.md.
 
-The installer asks for:
+## Desktop
 
-- target disk or partitions
-- filesystem formatting
-- hostname
-- first user
-- passwords
-- yspm repository
-- bootloader
+GNOME is the default desktop direction.
 
-Guided partitioning uses GPT with a 512 MiB EFI System Partition and the remaining space for an ext4 root filesystem.
+The target desktop profile includes the GNOME shell, Mutter, session components, settings, control center, file manager, portals, storage integration, permissions, login manager, audio, networking and Bluetooth.
 
-See [docs/INSTALL.md](docs/INSTALL.md).
+See docs/GNOME.md.
 
-## Desktop setup
+## Native repository
 
-GNOME is the default graphical environment.
+Native system packages use the .yspkg format.
 
-After the first boot:
+The package format provides metadata, file ownership, SHA-256 verification, shared-library dependency information, configuration-file handling, lifecycle hooks, service integration, triggers and transaction state through yspm.
 
-~~~bash
-sudo sh /usr/sbin/hc-setup-desktop
-~~~
+## Security and integrity
 
-The GNOME profile installs the desktop shell, session, settings components, display manager, portal stack, file manager, core applications, audio stack, networking, storage integration, and desktop permissions.
+Release images and repository metadata receive SHA-256 checksums.
 
-A lightweight labwc profile remains available for low-resource systems.
-
-See [docs/DESKTOP.md](docs/DESKTOP.md).
-
-## Init and services
-
-The init system is intentionally small and auditable.
-
-System services live under:
-
-~~~text
-/system/services
-~~~
-
-Boot scripts live under:
-
-~~~text
-/system/scripts
-~~~
-
-Configured services are enabled through:
-
-~~~text
-/system/enabled-services
-~~~
-
-The service control command is:
-
-~~~bash
-initctl start <service>
-initctl stop <service>
-initctl restart <service>
-initctl enable <service>
-initctl disable <service>
-initctl info <service>
-initctl list
-~~~
-
-The init system can start Ly automatically when it is installed; otherwise it falls back to tty gettys.
-
-## Native packages
-
-Native packages use:
-
-~~~text
-.yspkg
-~~~
-
-The format contains:
-
-~~~text
-metadata.json
-scripts/
-  preinstall
-  postinstall
-  preremove
-  postremove
-root/
-  usr/
-  etc/
-  var/
-~~~
-
-Package recipes in build.native/ use yspm to produce native packages.
-
-## Binary repository
-
-The repository currently contains a large legacy binary collection under repo/.
-
-The migration tool can create a native yspm repository:
-
-~~~bash
-python3 tools/migrate-legacy-repo.py \
-  --input repo \
-  --output repo-yspm/releases/1 \
-  --base-url https://example.org/hardcorelinux/releases/1 \
-  --yspm /tmp/yspm
-~~~
-
-A release can publish:
-
-~~~text
-repo-index.json
-*.yspkg
-SHA256SUMS
-HardcoreLinux-<tag>.img
-~~~
-
-## Integrity
-
-Release images and repository indexes receive SHA-256 checksums.
-
-For local release files:
-
-~~~bash
-sh tools/hc-release-checksums SHA256SUMS .
-~~~
-
-Repository metadata can be signed with the Ed25519 signing functionality provided by yspm.
+Repository indexes can additionally use Ed25519 signatures supported by yspm.
 
 ## CI/CD
 
-Pull requests and pushes run validation for:
+Pull requests and pushes validate shell syntax, ShellCheck and Python syntax.
 
-- shell syntax
-- ShellCheck errors
-- Python syntax
+Version tags build:
 
-Version tags matching v* trigger the release pipeline.
+- a UEFI disk image
+- a live ISO
+- the native package repository
+- repository metadata
+- SHA-256 checksums
 
-The release workflow:
+## Development status
 
-1. builds yspm
-2. builds the root filesystem
-3. extracts the repository kernel archive
-4. creates a UEFI disk image
-5. creates a live ISO
-6. converts legacy packages to yspkg
-7. generates the native repository index
-8. publishes the image, ISO, and packages
-9. publishes SHA-256 checksums
+The distribution is still under active development.
 
-## Benchmarks
+The largest remaining milestone is populating and runtime-testing the complete native GNOME package stack on musl, followed by real ISO boot testing, hardware testing, installer hardening, recovery tooling, firmware coverage and release qualification.
 
-The repository does not publish invented performance numbers.
-
-Collect local data with:
-
-~~~bash
-sudo sh /usr/bin/hc-bench
-~~~
-
-See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
-
-## Troubleshooting
-
-See [FAQ and Troubleshooting](docs/FAQ.md) for installer, musl, network, audio, yspm, and desktop issues.
-
-## Documentation
-
-- [Installation](docs/INSTALL.md)
-- [Desktop Setup](docs/DESKTOP.md)
-- [FAQ and Troubleshooting](docs/FAQ.md)
-- [Benchmarks](docs/BENCHMARKS.md)
-- [Showcase](docs/SHOWCASE.md)
-- [Native Repository](repo/README.md)
+The project intentionally does not publish invented benchmark numbers or pretend that an untested component is production-ready.
 
 ## License
 

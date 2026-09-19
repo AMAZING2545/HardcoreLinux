@@ -68,7 +68,7 @@ grub-install \
     --target=x86_64-efi \
     --efi-directory="$MNT/boot/efi" \
     --boot-directory="$MNT/boot" \
-    --bootloader-id=HardcoreLinux \
+    --bootloader-id=ObsidianCoreLinux \
     --removable \
     --no-nvram \
     --recheck
@@ -77,7 +77,7 @@ mkdir -p "$MNT/boot/grub"
 cat > "$MNT/boot/grub/grub.cfg" <<EOF
 search --no-floppy --fs-uuid --set=root $ROOT_UUID
 set timeout=3
-menuentry 'Hardcore Linux' {
+menuentry 'Obsidian Core Linux' {
     linux /boot/vmlinuz root=UUID=$ROOT_UUID rw init=/etc/init
 }
 EOF

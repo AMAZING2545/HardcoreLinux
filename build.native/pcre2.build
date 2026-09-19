@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted pcre2 source tree}"
+: "${YSPM_BIN:=yspm}"
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-pcre2-10.45-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "pcre2" "10.45" "Perl-compatible regular expression library"

@@ -59,12 +59,12 @@ cat > "$WORK/iso/boot/grub/grub.cfg" <<'EOF'
 set timeout=4
 set default=0
 
-menuentry 'Hardcore Linux' {
+menuentry 'Obsidian Core Linux' {
     linux /boot/vmlinuz rdinit=/init
     initrd /boot/initramfs.img
 }
 
-menuentry 'Hardcore Linux (installer)' {
+menuentry 'Obsidian Core Linux (installer)' {
     linux /boot/vmlinuz rdinit=/init
     initrd /boot/initramfs.img
 }

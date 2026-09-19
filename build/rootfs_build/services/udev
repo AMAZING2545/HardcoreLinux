@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+UDEVD=
+for daemon in /usr/lib/udev/udevd /usr/libexec/udevd /sbin/udevd /usr/sbin/udevd; do
+    if [ -x "$daemon" ]; then
+        UDEVD="$daemon"
+        break
+    fi
+done
+
+[ -n "$UDEVD" ] || {
+    echo "udev: daemon not found" >&2
+    exit 1
+}
+
+"$UDEVD" --daemon
+if command -v udevadm >/dev/null 2>&1; then
+    udevadm trigger --action=add >/dev/null 2>&1 || true
+    udevadm settle >/dev/null 2>&1 || true
+fi
+
+while :; do
+    sleep 3600
+done

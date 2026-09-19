@@ -1,0 +1,49 @@
+#!/bin/sh
+set -u
+
+ok=0
+warn=0
+fail=0
+
+check() {
+    name="$1"
+    shift
+    if "$@" >/dev/null 2>&1; then
+        printf '[  ok  ] %s\n' "$name"
+        ok=$((ok + 1))
+    else
+        printf '[ warn ] %s\n' "$name"
+        warn=$((warn + 1))
+    fi
+}
+
+printf '%s\n' 'Obsidian Core Linux system doctor'
+printf '%s\n\n' 'Read-only diagnostics; no system changes are made.'
+
+check "kernel is running" uname -r
+check "init system exists" test -x /etc/init
+check "yspm installed" test -x /usr/bin/yspm
+check "D-Bus command exists" command -v dbus-daemon
+check "elogind command exists" sh -c 'command -v elogind || test -x /usr/libexec/elogind || test -x /usr/lib/elogind/elogind'
+check "NetworkManager command exists" command -v NetworkManager
+check "PipeWire command exists" command -v pipewire
+check "WirePlumber command exists" command -v wireplumber
+check "GNOME Shell installed" command -v gnome-shell
+check "Mutter installed" command -v mutter
+check "GDM installed" command -v gdm
+
+printf '\nInstalled desktop:\n'
+if [ -f /etc/default/obsidian-desktop ]; then
+    cat /etc/default/obsidian-desktop
+else
+    printf '%s\n' 'No desktop profile has been configured yet.'
+fi
+
+printf '\nyspm status:\n'
+if command -v yspm >/dev/null 2>&1; then
+    yspm release 2>/dev/null || true
+    yspm check 2>/dev/null || true
+fi
+
+printf '\nSummary: %s ok, %s warnings, %s failures.\n' "$ok" "$warn" "$fail"
+[ "$fail" -eq 0 ]

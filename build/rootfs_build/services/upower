@@ -1,0 +1,6 @@
+#!/bin/sh
+for daemon in /usr/libexec/upowerd /usr/lib/upower/upowerd /usr/sbin/upowerd; do
+    if [ -x "$daemon" ]; then exec "$daemon"; fi
+done
+echo "upower: daemon not found" >&2
+exit 1

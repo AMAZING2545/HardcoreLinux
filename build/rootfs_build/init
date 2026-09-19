@@ -1,9 +1,10 @@
 #!/bin/sh
 set -u
 
-echo "Hardcore Linux init"
+echo "Obsidian Core Linux init"
 
-mount -t proc proc /proc 2>/dev/null || true
+mount -t proc proc /proc
+ 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
 mkdir -p /dev/pts /dev/mqueue /run /tmp /system/tmp /run/user
 mount -t devpts devpts /dev/pts 2>/dev/null || true
@@ -11,6 +12,13 @@ mount -t mqueue mqueue /dev/mqueue 2>/dev/null || true
 mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
+
+if grep -qw 'obsidian.recovery=1' /proc/cmdline 2>/dev/null; then
+    echo "[  ok  ] recovery mode requested"
+    exec /usr/bin/hc-recovery
+fi
+
+
 
 [ -f /etc/profile ] && . /etc/profile
 [ -f /etc/hostname ] && hostname "$(cat /etc/hostname)" 2>/dev/null || true
@@ -20,9 +28,13 @@ echo "[  ok  ] mounted VFS nodes"
 if [ -w /proc/sys/kernel/hotplug ]; then
     echo "/sbin/mdev" > /proc/sys/kernel/hotplug
 fi
-if command -v mdev >/dev/null 2>&1; then
+if command -v udevadm >/dev/null 2>&1 && pidof udevd >/dev/null 2>&1; then
+    udevadm trigger --action=add >/dev/null 2>&1 || true
+    udevadm settle >/dev/null 2>&1 || true
+    echo "[  ok  ] populated /dev with udev"
+elif command -v mdev >/dev/null 2>&1; then
     mdev -s >/dev/null 2>&1 || true
-    echo "[  ok  ] populated /dev"
+    echo "[  ok  ] populated /dev with mdev"
 fi
 
 if [ -f /system/drivers/modprobe ] && command -v modprobe >/dev/null 2>&1; then

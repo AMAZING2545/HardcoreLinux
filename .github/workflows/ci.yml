@@ -27,12 +27,41 @@ jobs:
             tools/extract-kernel \
             tools/build-image \
             tools/run-qemu \
+            tools/run-iso \
+            tools/hc-doctor \
+            tools/hc-recovery \
+            tools/obsidian-first-login \
+            tools/migrate-independent.sh \
+            tools/build-native-meson \
+            tools/build-native-configure \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \
             build/rootfs_build/scripts/00000-eth0-dhcp \
             build/rootfs_build/services/iwd \
             build/rootfs_build/services/dbus \
+            build/rootfs_build/services/elogind \
+            build/rootfs_build/services/NetworkManager \
+            build/rootfs_build/services/polkit \
+            build/rootfs_build/services/bluetooth \
+            build/rootfs_build/services/upower \
+            build/rootfs_build/services/power-profiles-daemon \
+            build/rootfs_build/services/fwupd \
+            build/rootfs_build/services/udev \
+            build/rootfs_build/services/chronyd \
+            build/rootfs_build/services/nftables \
+            build/rootfs_build/services/iwd \
+            build/rootfs_build/services/dbus \
+            build/rootfs_build/services/elogind \
+            build/rootfs_build/services/NetworkManager \
+            build/rootfs_build/services/polkit \
+            build/rootfs_build/services/bluetooth \
+            build/rootfs_build/services/upower \
+            build/rootfs_build/services/power-profiles-daemon \
+            build/rootfs_build/services/fwupd \
+            build/rootfs_build/services/udev \
+            build/rootfs_build/services/chronyd \
+            build/rootfs_build/services/nftables \
             build.native/yspm.build \
             build.native/labwc.build \
             build.native/ly.build \
@@ -56,6 +85,13 @@ jobs:
             tools/extract-kernel \
             tools/build-image \
             tools/run-qemu \
+            tools/run-iso \
+            tools/hc-doctor \
+            tools/hc-recovery \
+            tools/obsidian-first-login \
+            tools/migrate-independent.sh \
+            tools/build-native-meson \
+            tools/build-native-configure \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \

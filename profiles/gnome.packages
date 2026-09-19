@@ -1,35 +1,54 @@
-# Hardcore Linux GNOME desktop profile
-# GNOME 51 target. Package revisions are resolved by yspm.
+# Obsidian Core Linux GNOME 51 desktop profile
+# Package names follow the GNOME stack used by musl-based distributions.
+# yspm repository revisions are authoritative.
 
 adwaita-fonts
 adwaita-icon-theme
 accountsservice
-sudo
+bolt
+dbus-x11
 dconf
 desktop-file-utils
 elogind
-gsettings-desktop-schemas
+gcr
+gdm
+gnome-backgrounds
+gnome-browser-connector
+gnome-calculator
+gnome-calendar
 gnome-control-center
+gnome-disk-utility
+gnome-initial-setup
 gnome-keyring
+gnome-online-accounts
+gnome-remote-desktop
 gnome-session
 gnome-settings-daemon
 gnome-shell
 gnome-shell-extensions
+gnome-software
+gnome-system-monitor
+gnome-text-editor
+gnome-tour
+gnome-user-docs
+gsettings-desktop-schemas
+gst-thumbnailers
 gvfs
+iio-sensor-proxy
+loupe
+localsearch
 mesa
+mesa-dri-gallium
 mutter
+nautilus
+pinentry-gnome
 polkit
+polkit-gnome
+sudo
+tinysparql
 udisks2
 xdg-desktop-portal
 xdg-desktop-portal-gnome
+xdg-desktop-portal-gtk
 xdg-user-dirs
 xwayland
-
-# Core applications
-gnome-calculator
-gnome-calendar
-gnome-console
-gnome-text-editor
-loupe
-nautilus
-evince
