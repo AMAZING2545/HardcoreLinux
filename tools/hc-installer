@@ -121,7 +121,7 @@ printf '%s\n' 'Set user password:'
 chroot "$TARGET" passwd "$USERNAME"
 printf '%s\n' 'Set root password:'
 chroot "$TARGET" passwd root
-chroot "$TARGET" /bin/sh -c "mkdir -p /home/$USERNAME/.config; chown -R $USERNAME:$USERNAME /home/$USERNAME"
+chroot "$TARGET" /bin/sh -c "mkdir -p /home/$USERNAME/.config/obsidian-core; touch /home/$USERNAME/.config/obsidian-core/.first-login; chown -R $USERNAME:$USERNAME /home/$USERNAME"
 
 ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
 ESP_UUID=$(blkid -s UUID -o value "$ESP")
