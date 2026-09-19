@@ -1,0 +1,19 @@
+#!/bin/sh
+
+#
+# download at https://github.com/dosfstools/dosfstools/releases/download/v4.2/dosfstools-4.2.tar.gz
+#
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --prefix=/usr
+make -j$(nproc)
+make DESTDIR=/tmp/stage install
+rm /tmp/stage
+mkdir -p /tmp/stage/etc/installer/dosfstools
+echo 'dosfstools 4.2 musl' > /tmp/stage/etc/installer/dosfstools/pkinfo
+rm -r /tmp/stage/usr/share
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .

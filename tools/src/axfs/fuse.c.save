@@ -454,60 +454,8 @@ int axfs_statfs(const char *path, struct statvfs *s) {
 	return 0;
 }
 
-int axfs_rename(const char *oldpath, const char *newpath, unsigned int f){
-        //resolve its path
-        const struct fuse_context *ctx = fuse_get_context();
-        uint16_t user= ctx->uid;
-        printf("rmdir: user: %d\n",user);
-        uint16_t groupc = 1;//getgroups(0, NULL)+1;
-        uint16_t groups = ctx->gid;
-        uint64_t inum = path2inode (a, oldpath ,user, &groups, groupc,fd);
-        printf("inode: %d\n",inum);
-        uint32_t inum2=inum;
-        if(inum==-1||inum==-2)
-                return -EACCES;
-        //link to the new directory
-        axfs_link(oldpath,newpath);
-        if(inum>>32==1){ //directory
-                //unlink .. from original
-                char* dotdot = calloc(4096,1);
-                int count=0;
-                for(int i = 0; i<4096; i++){
-                        if(*(oldpath+i)==0){*(dotdot+i)='/';    count=i+1; break;}
-                        *(dotdot+i) = *(oldpath+i);
-                }
-                *(dotdot+count)='.';
-                *(dotdot+count+1)='.';
-                printf("unlinking %s\n", dotdot);
-                axfs_unlink(dotdot);
+int axfs_rename(struct fuse_fs *fs, const char *oldpath,const char *newpath, unsigned int flags){
 
-                //link .. to parent
-                char* old = calloc(4096,1);
-                strcpy(old, newpath);
-                uint16_t last_slash_pos = 0;
-                for (int i = 0; i<4096&&*old; i++){
-                        if(*(old+i)=='/')
-                                last_slash_pos = i;
-                }
-                *(old+last_slash_pos)=0;
-                free(dotdot);
-                dotdot = calloc(4096,1);
-                count=0;
-                for(int i = 0; i<4096; i++){
-                        if(*(newpath+i)==0){*(dotdot+i)='/';    count=i+1;      break;}
-                        *(dotdot+i) = *(newpath+i);
-                }
-                *(dotdot+count)='.';
-                *(dotdot+count+1)='.';
-                printf("linking %s to %s\n", dotdot, old);
-                axfs_link(old, dotdot);
-                free(old);
-                free(dotdot);
-        }
-        //unlink the old path
-        axfs_unlink(oldpath);
-        return 0;
-}
 
 static struct fuse_operations axfs = {
     .getattr    = axfs_getattr,
@@ -528,8 +476,8 @@ static struct fuse_operations axfs = {
     .readlink   = axfs_readlink,
     .utimens	= axfs_utimens,
     .statfs	= axfs_statfs,
-    .rename	= axfs_rename,
 };
+
 
 int main(int argc, char* argv[]){
 	a=malloc(sizeof(header));
