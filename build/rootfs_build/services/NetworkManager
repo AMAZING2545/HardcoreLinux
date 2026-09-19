@@ -1,0 +1,8 @@
+#!/bin/sh
+for daemon in /usr/sbin/NetworkManager /usr/bin/NetworkManager; do
+    if [ -x "$daemon" ]; then
+        exec "$daemon" --no-daemon
+    fi
+done
+echo "NetworkManager: daemon not found" >&2
+exit 1
