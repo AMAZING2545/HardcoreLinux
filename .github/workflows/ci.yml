@@ -71,8 +71,171 @@ jobs:
           test -s iso-root/boot/initramfs.img
           test -s iso-root/boot/grub/grub.cfg
           gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null
-          grep -Eq '(^|/)etc/hc-live$' initramfs.list
-          grep -Eq '(^|/)usr/sbin/hc-installer$' initramfs.list
+          grep -Eq '(^|/)init          sha256sum "$ISO" | tee "$ISO.sha256"
+      - name: Boot ISO in UEFI QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE"
+          set +e
+          timeout --kill-after=5s 35s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -no-shutdown             -display none             -serial stdio             > qemu.log 2>&1
+          rc=$?
+          set -e
+          cat qemu.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux installer' qemu.log
+      - name: Upload verified ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload boot log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 90
+ initramfs.list
+          grep -Eq '(^|/)bin/sh          sha256sum "$ISO" | tee "$ISO.sha256"
+      - name: Boot ISO in UEFI QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE"
+          set +e
+          timeout --kill-after=5s 35s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -no-shutdown             -display none             -serial stdio             > qemu.log 2>&1
+          rc=$?
+          set -e
+          cat qemu.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux installer' qemu.log
+      - name: Upload verified ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload boot log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 90
+ initramfs.list
+          grep -Eq '(^|/)etc/init          sha256sum "$ISO" | tee "$ISO.sha256"
+      - name: Boot ISO in UEFI QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE"
+          set +e
+          timeout --kill-after=5s 35s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -no-shutdown             -display none             -serial stdio             > qemu.log 2>&1
+          rc=$?
+          set -e
+          cat qemu.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux installer' qemu.log
+      - name: Upload verified ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload boot log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 90
+ initramfs.list
+          grep -Eq '(^|/)etc/hc-live          sha256sum "$ISO" | tee "$ISO.sha256"
+      - name: Boot ISO in UEFI QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE"
+          set +e
+          timeout --kill-after=5s 35s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -no-shutdown             -display none             -serial stdio             > qemu.log 2>&1
+          rc=$?
+          set -e
+          cat qemu.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux installer' qemu.log
+      - name: Upload verified ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload boot log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 90
+ initramfs.list
+          grep -Eq '(^|/)usr/sbin/hc-installer          sha256sum "$ISO" | tee "$ISO.sha256"
+      - name: Boot ISO in UEFI QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE"
+          set +e
+          timeout --kill-after=5s 35s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -no-shutdown             -display none             -serial stdio             > qemu.log 2>&1
+          rc=$?
+          set -e
+          cat qemu.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux installer' qemu.log
+      - name: Upload verified ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload boot log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 90
+ initramfs.list
+
+          rm -rf initramfs-root
+          mkdir -p initramfs-root
+          gzip -dc iso-root/boot/initramfs.img | cpio -idm -D initramfs-root >/dev/null 2>&1
+          test -f initramfs-root/init
+          test -x initramfs-root/init
+          test -e initramfs-root/bin/sh
+          test -x initramfs-root/bin/sh
+          test -f initramfs-root/etc/init
+
           xorriso -indev "$ISO" -report_el_torito plain
           sha256sum "$ISO" | tee "$ISO.sha256"
       - name: Boot ISO in UEFI QEMU
