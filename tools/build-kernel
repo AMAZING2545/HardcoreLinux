@@ -98,6 +98,7 @@ set_config CONFIG_VIRTIO_PCI y
 set_config CONFIG_VIRTIO_BLK y
 
 # Keep common real-hardware storage and USB support built in.
+set_config CONFIG_CPU_MITIGATIONS y
 set_config CONFIG_ATA y
 set_config CONFIG_SATA_AHCI y
 set_config CONFIG_EFI y
@@ -110,7 +111,16 @@ set_config CONFIG_ISO9660_FS y
 set_config CONFIG_VFAT_FS y
 set_config CONFIG_MSDOS_FS y
 set_config CONFIG_USB_STORAGE y
+set_config CONFIG_USB_UAS y
+set_config CONFIG_USB_XHCI_HCD y
+set_config CONFIG_USB_EHCI_HCD y
 set_config CONFIG_HID_GENERIC y
+set_config CONFIG_INPUT_EVDEV y
+set_config CONFIG_DRM_I915 y
+set_config CONFIG_DRM_FBDEV_EMULATION y
+set_config CONFIG_SND_HDA_INTEL y
+set_config CONFIG_SND_HDA_CODEC_HDMI y
+set_config CONFIG_RFKILL y
 set_config CONFIG_SERIAL_8250_CONSOLE y
 
 (
