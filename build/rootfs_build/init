@@ -3,12 +3,8 @@ set -u
 
 echo "Obsidian Core Linux init"
 
-if grep -qw 'obsidian.recovery=1' /proc/cmdline 2>/dev/null; then
-    echo "[  ok  ] recovery mode requested"
-    exec /usr/bin/hc-recovery
-fi
-
-mount -t proc proc /proc 2>/dev/null || true
+mount -t proc proc /proc
+ 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
 mkdir -p /dev/pts /dev/mqueue /run /tmp /system/tmp /run/user
 mount -t devpts devpts /dev/pts 2>/dev/null || true
@@ -16,6 +12,13 @@ mount -t mqueue mqueue /dev/mqueue 2>/dev/null || true
 mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
+
+if grep -qw 'obsidian.recovery=1' /proc/cmdline 2>/dev/null; then
+    echo "[  ok  ] recovery mode requested"
+    exec /usr/bin/hc-recovery
+fi
+
+
 
 [ -f /etc/profile ] && . /etc/profile
 [ -f /etc/hostname ] && hostname "$(cat /etc/hostname)" 2>/dev/null || true
