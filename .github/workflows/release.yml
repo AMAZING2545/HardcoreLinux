@@ -25,15 +25,18 @@ jobs:
       - name: Install image build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            dosfstools \
-            e2fsprogs \
-            grub-efi-amd64-bin \
-            grub2-common \
-            xorriso \
+          sudo apt-get install -y --no-install-recommends \
             cpio \
+            e2fsprogs \
+            file \
+            grub-efi-amd64-bin \
+            grub-pc-bin \
+            grub2-common \
+            mtools \
+            ovmf \
+            qemu-system-x86 \
+            xorriso \
             gzip \
-            util-linux \
             python3
 
       - name: Build yspm
@@ -73,6 +76,292 @@ jobs:
             /tmp/rootfs.tar \
             /tmp/vmlinuz \
             "$PWD/ObsidianCoreLinux-$GITHUB_REF_NAME.iso"
+
+      - name: Verify and boot-test ISO
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-$GITHUB_REF_NAME.iso"
+          test -s "$ISO"
+
+          rm -rf iso-root initramfs-root
+          mkdir -p iso-root initramfs-root
+          xorriso -osirrox on -indev "$ISO" -extract /boot iso-root/boot
+          test -s iso-root/boot/vmlinuz
+          test -s iso-root/boot/initramfs.img
+          test -s iso-root/boot/grub/grub.cfg
+
+          gzip -t iso-root/boot/initramfs.img
+          gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null
+          grep -Eq '(^|/)init      - name: Build native package repository
+        run: |
+          rm -rf repo-yspm
+          python3 tools/migrate-legacy-repo.py \
+            --input repo \
+            --output repo-yspm/releases/1 \
+            --base-url "https://github.com/${{ github.repository }}/releases/download/$GITHUB_REF_NAME" \
+            --release 1 \
+            --abi yspm-abi-1 \
+            --arch x86_64 \
+            --yspm /tmp/yspm
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Obsidian Core Linux $GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Upload image and repository index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp repo-yspm/releases/1/index.json repo-index.json
+          gh release upload "$GITHUB_REF_NAME" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json \
+            --clobber
+
+      - name: Upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find repo-yspm/releases/1/packages -type f -name '*.yspkg' -print0 |
+            xargs -0 -r -n 12 gh release upload "$GITHUB_REF_NAME" --clobber
+
+      - name: Generate release checksums
+        run: |
+          sha256sum \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json > SHA256SUMS
+
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS --clobber
+ initramfs.list
+          grep -Eq '(^|/)bin/sh      - name: Build native package repository
+        run: |
+          rm -rf repo-yspm
+          python3 tools/migrate-legacy-repo.py \
+            --input repo \
+            --output repo-yspm/releases/1 \
+            --base-url "https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/download/$GITHUB_REF_NAME" \
+            --release 1 \
+            --abi yspm-abi-1 \
+            --arch x86_64 \
+            --yspm /tmp/yspm
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Obsidian Core Linux $GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Upload image and repository index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp repo-yspm/releases/1/index.json repo-index.json
+          gh release upload "$GITHUB_REF_NAME" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json \
+            --clobber
+
+      - name: Upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find repo-yspm/releases/1/packages -type f -name '*.yspkg' -print0 |
+            xargs -0 -r -n 12 gh release upload "$GITHUB_REF_NAME" --clobber
+
+      - name: Generate release checksums
+        run: |
+          sha256sum \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json > SHA256SUMS
+
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS --clobber
+ initramfs.list
+          grep -Eq '(^|/)etc/init      - name: Build native package repository
+        run: |
+          rm -rf repo-yspm
+          python3 tools/migrate-legacy-repo.py \
+            --input repo \
+            --output repo-yspm/releases/1 \
+            --base-url "https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/download/$GITHUB_REF_NAME" \
+            --release 1 \
+            --abi yspm-abi-1 \
+            --arch x86_64 \
+            --yspm /tmp/yspm
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Obsidian Core Linux $GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Upload image and repository index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp repo-yspm/releases/1/index.json repo-index.json
+          gh release upload "$GITHUB_REF_NAME" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json \
+            --clobber
+
+      - name: Upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find repo-yspm/releases/1/packages -type f -name '*.yspkg' -print0 |
+            xargs -0 -r -n 12 gh release upload "$GITHUB_REF_NAME" --clobber
+
+      - name: Generate release checksums
+        run: |
+          sha256sum \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json > SHA256SUMS
+
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS --clobber
+ initramfs.list
+          grep -Eq '(^|/)etc/hc-live      - name: Build native package repository
+        run: |
+          rm -rf repo-yspm
+          python3 tools/migrate-legacy-repo.py \
+            --input repo \
+            --output repo-yspm/releases/1 \
+            --base-url "https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/download/$GITHUB_REF_NAME" \
+            --release 1 \
+            --abi yspm-abi-1 \
+            --arch x86_64 \
+            --yspm /tmp/yspm
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Obsidian Core Linux $GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Upload image and repository index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp repo-yspm/releases/1/index.json repo-index.json
+          gh release upload "$GITHUB_REF_NAME" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json \
+            --clobber
+
+      - name: Upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find repo-yspm/releases/1/packages -type f -name '*.yspkg' -print0 |
+            xargs -0 -r -n 12 gh release upload "$GITHUB_REF_NAME" --clobber
+
+      - name: Generate release checksums
+        run: |
+          sha256sum \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json > SHA256SUMS
+
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS --clobber
+ initramfs.list
+          grep -Eq '(^|/)usr/sbin/hc-installer      - name: Build native package repository
+        run: |
+          rm -rf repo-yspm
+          python3 tools/migrate-legacy-repo.py \
+            --input repo \
+            --output repo-yspm/releases/1 \
+            --base-url "https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/download/$GITHUB_REF_NAME" \
+            --release 1 \
+            --abi yspm-abi-1 \
+            --arch x86_64 \
+            --yspm /tmp/yspm
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Obsidian Core Linux $GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Upload image and repository index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp repo-yspm/releases/1/index.json repo-index.json
+          gh release upload "$GITHUB_REF_NAME" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json \
+            --clobber
+
+      - name: Upload native packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find repo-yspm/releases/1/packages -type f -name '*.yspkg' -print0 |
+            xargs -0 -r -n 12 gh release upload "$GITHUB_REF_NAME" --clobber
+
+      - name: Generate release checksums
+        run: |
+          sha256sum \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
+            repo-index.json > SHA256SUMS
+
+      - name: Upload checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" SHA256SUMS --clobber
+ initramfs.list
+
+          OVMF_CODE="$(find /usr/share -type f ( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' ) | head -n 1)"
+          test -n "$OVMF_CODE"
+
+          set +e
+          timeout --kill-after=5s 30s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -display none             -serial stdio             > release-qemu.log 2>&1
+          rc=$?
+          set -e
+
+          cat release-qemu.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux init' release-qemu.log
+          grep -q 'Obsidian Core Linux installer' release-qemu.log
+
+          sha256sum "$ISO" > "$ISO.sha256"
 
       - name: Build native package repository
         run: |
