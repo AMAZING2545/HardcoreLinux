@@ -95,7 +95,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            busybox-static \\
+            busybox-static \
             bc \
             bison \
             build-essential \
@@ -163,7 +163,7 @@ jobs:
 
           test -s live-root/live/bin/sh
           test -s live-root/live/etc/init
-          test -s live-root/live/etc/hc-live
+          test -f live-root/live/etc/hc-live
           test -s live-root/live/usr/sbin/hc-installer
 
           for path in \
