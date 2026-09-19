@@ -43,6 +43,7 @@ jobs:
         env:
           YSPM_BIN: /tmp/yspm
           YSPM_REPOSITORY_URL: https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json
+          YSPM_ARCHIVE_DIR: ${{ github.workspace }}/repo
           ROOTFS: /tmp/rootfs
           OUTPUT: /tmp/rootfs.tar
           DISTRO_VERSION: ${{ github.ref_name }}
@@ -51,7 +52,7 @@ jobs:
 
       - name: Extract kernel
         run: |
-          ARCHIVE=linux_UEFI_standalone.tar
+          ARCHIVE=repo/linux_UEFI_standalone.tar
           test -f "$ARCHIVE"
           sudo sh tools/extract-kernel "$ARCHIVE" /tmp/vmlinuz
 
@@ -67,7 +68,7 @@ jobs:
         run: |
           rm -rf repo-yspm
           python3 tools/migrate-legacy-repo.py \
-            --input . \
+            --input repo \
             --output repo-yspm/releases/1 \
             --base-url "https://github.com/Yassine-Jemi01/HardcoreLinux/releases/download/$GITHUB_REF_NAME" \
             --release 1 \
