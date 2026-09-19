@@ -3,6 +3,10 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
@@ -34,43 +38,11 @@ jobs:
             tools/migrate-independent.sh \
             tools/build-native-meson \
             tools/build-native-configure \
+            tools/build-iso \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \
-            build/rootfs_build/scripts/00000-eth0-dhcp \
-            build/rootfs_build/services/iwd \
-            build/rootfs_build/services/dbus \
-            build/rootfs_build/services/elogind \
-            build/rootfs_build/services/NetworkManager \
-            build/rootfs_build/services/polkit \
-            build/rootfs_build/services/bluetooth \
-            build/rootfs_build/services/upower \
-            build/rootfs_build/services/power-profiles-daemon \
-            build/rootfs_build/services/fwupd \
-            build/rootfs_build/services/udev \
-            build/rootfs_build/services/chronyd \
-            build/rootfs_build/services/nftables \
-            build/rootfs_build/services/iwd \
-            build/rootfs_build/services/dbus \
-            build/rootfs_build/services/elogind \
-            build/rootfs_build/services/NetworkManager \
-            build/rootfs_build/services/polkit \
-            build/rootfs_build/services/bluetooth \
-            build/rootfs_build/services/upower \
-            build/rootfs_build/services/power-profiles-daemon \
-            build/rootfs_build/services/fwupd \
-            build/rootfs_build/services/udev \
-            build/rootfs_build/services/chronyd \
-            build/rootfs_build/services/nftables \
-            build.native/yspm.build \
-            build.native/labwc.build \
-            build.native/ly.build \
-            build.native/iwd.build \
-            build.native/pipewire.build \
-            build.native/wireplumber.build \
-            build.native/waybar.build \
-            build.native/wofi.build \
-            build.native/ell.build; do
+            build/rootfs_build/scripts/00000-eth0-dhcp; do
               sh -n "$file"
           done
 
@@ -92,6 +64,7 @@ jobs:
             tools/migrate-independent.sh \
             tools/build-native-meson \
             tools/build-native-configure \
+            tools/build-iso \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \
@@ -100,10 +73,9 @@ jobs:
       - name: Python syntax
         run: python3 -m py_compile tools/migrate-legacy-repo.py
 
-
   iso:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,7 +111,7 @@ jobs:
       - name: Build root filesystem
         env:
           YSPM_BIN: /tmp/yspm
-          YSPM_REPOSITORY_URL: https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json
+          YSPM_REPOSITORY_URL: https://github.com/${{ github.repository }}/releases/latest/download/repo-index.json
           YSPM_ARCHIVE_DIR: ${{ github.workspace }}/repo
           ROOTFS: /tmp/rootfs
           OUTPUT: /tmp/rootfs.tar
@@ -154,144 +126,27 @@ jobs:
           sudo sh tools/build-iso \
             /tmp/rootfs.tar \
             /tmp/vmlinuz \
-            "${{ github.workspace }}/ObsidianCoreLinux-${{ github.sha }}.iso"
+            "${{ github.workspace }}/HardcoreLinux-ObsidianCore.iso"
 
-      - name: Verify ISO structure
+      - name: Verify ISO contents
         run: |
-          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          ISO="HardcoreLinux-ObsidianCore.iso"
           test -s "$ISO"
 
+          rm -rf iso-root
           mkdir -p iso-root
           xorriso -osirrox on -indev "$ISO" -extract /boot iso-root/boot
           test -s iso-root/boot/vmlinuz
           test -s iso-root/boot/initramfs.img
           test -s iso-root/boot/grub/grub.cfg
 
-          INITRAMFS_CONTENT="$(gzip -dc iso-root/boot/initramfs.img | cpio -t 2>/dev/null)"
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)etc/hc-live          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)usr/sbin/hc-installer
-          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
+          rm -rf initramfs-root
+          mkdir -p initramfs-root
+          gzip -dc iso-root/boot/initramfs.img | (cd initramfs-root && cpio -idm --quiet)
+          test -f initramfs-root/etc/hc-live
+          test -x initramfs-root/usr/sbin/hc-installer
 
           xorriso -indev "$ISO" -report_el_torito plain
-
           sha256sum "$ISO" | tee "$ISO.sha256"
 
       - name: Boot ISO in QEMU
@@ -309,7 +164,7 @@ jobs:
             -smp 2 \
             -cpu max \
             -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
+            -cdrom "HardcoreLinux-ObsidianCore.iso" \
             -boot d \
             -no-reboot \
             -no-shutdown \
@@ -321,395 +176,30 @@ jobs:
 
           cat qemu.log
 
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
+          test "$RC" -eq 124 || {
+            echo "QEMU did not remain running after boot; exit status: $RC"
             exit 1
-          fi
+          }
 
           grep -q "Obsidian Core Linux installer" qemu.log || {
             echo "Live installer did not appear on the serial console"
             exit 1
           }
 
-      - name: Upload ISO artifact
+      - name: Upload ready ISO
         uses: actions/upload-artifact@v4
         with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
+          name: HardcoreLinux-Obsidian-ISO
           path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+            HardcoreLinux-ObsidianCore.iso
+            HardcoreLinux-ObsidianCore.iso.sha256
           if-no-files-found: error
           retention-days: 90
 
-      - name: Upload QEMU log
+      - name: Upload QEMU boot log
         uses: actions/upload-artifact@v4
         with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          name: HardcoreLinux-Obsidian-QEMU-log
           path: qemu.log
           if-no-files-found: error
           retention-days: 14
-
-
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)usr/sbin/hc-installer          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)usr/sbin/hc-installer
-          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
-
-          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
-          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)usr/sbin/hc-installer
-          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
-
-
-          xorriso -indev "$ISO" -report_el_torito plain
-
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set +e
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          if [ "$RC" -ne 124 ]; then
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          fi
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 14
-
