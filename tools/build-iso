@@ -84,6 +84,8 @@ cp "$WORK/esp/efi.img" "$WORK/live/boot/efi.img"
 )
 
 cp "$KERNEL" "$WORK/iso/boot/vmlinuz"
+cp "$WORK/BOOTX64.EFI" "$WORK/iso/boot/BOOTX64.EFI"
+cp "$WORK/esp/efi.img" "$WORK/iso/boot/efi.img"
 
 cat > "$WORK/iso/boot/grub/grub.cfg" <<'EOF'
 set timeout=4
