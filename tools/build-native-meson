@@ -26,7 +26,7 @@ trap 'rm -rf "$STAGE"' EXIT INT TERM
 
 cd "$DIR"
 rm -rf build
-meson setup build --prefix="$PREFIX" -Dman=false
+meson setup build --prefix="$PREFIX"
 ninja -C build
 DESTDIR="$STAGE" meson install -C build
 
