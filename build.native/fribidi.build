@@ -1,21 +1,8 @@
-
-
 #!/bin/sh
+set -eu
 
-wd=$(pwd)
-cd $dir
-rm -rf /tmp/stage
-rm -rf build
-mkdir build && cd build
-meson setup .. --prefix=/usr -Ddocs=false --reconfigure
-ninja
-meson install --destdir=/tmp/stage
-mkdir -p /tmp/stage/etc/installer/fribidi
-find /tmp/stage -name *.so -exec strip --strip-all {} \;
-echo 'fribidi 1.0.16 musl' > /tmp/stage/etc/installer/fribidi/pkinfo
-rm -rf /tmp/stage/usr/share/man
-rm -rf /tmp/stage/usr/share/info
-rm -rf /tmp/stage/usr/share/doc
-cd $wd
-./flashpack /tmp/stage
-mv /tmp/stage/*.tar .
+: "${dir:?set dir to the extracted fribidi source tree}"
+: "${YSPM_BIN:=yspm}"
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-fribidi-1.0.16-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "fribidi" "1.0.16" "Unicode bidirectional text library"
