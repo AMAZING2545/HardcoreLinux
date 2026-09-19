@@ -26,12 +26,14 @@ jobs:
             tools/build-yspm \
             tools/extract-kernel \
             tools/build-image \
+            tools/run-qemu \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \
             build/rootfs_build/scripts/00000-eth0-dhcp \
             build/rootfs_build/services/iwd \
             build/rootfs_build/services/dbus \
+            build.native/yspm.build \
             build.native/labwc.build \
             build.native/ly.build \
             build.native/iwd.build \
@@ -53,6 +55,7 @@ jobs:
             tools/build-yspm \
             tools/extract-kernel \
             tools/build-image \
+            tools/run-qemu \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \
