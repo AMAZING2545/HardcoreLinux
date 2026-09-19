@@ -1,3 +1,4 @@
+# Final release qualification: build, install, verify, and boot-test.
 name: CI
 
 on:
