@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted libadwaita source tree}"
+: "${YSPM_BIN:=yspm}"
+
+"${REPO_ROOT:-tools}/build-native-meson" "$dir" "libadwaita-1.10.0-${ARCH:-x86_64}.yspkg" "libadwaita" "1.10.0" "GNOME adaptive UI toolkit"
