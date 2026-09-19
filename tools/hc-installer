@@ -156,7 +156,11 @@ EOF
 chmod 0644 "$TARGET/etc/profile.d/yspm.sh"
 
 chroot "$TARGET" /bin/sh -c "adduser -D -h /home/$USERNAME -s /bin/sh '$USERNAME' 2>/dev/null || adduser -h /home/$USERNAME -s /bin/sh '$USERNAME'"
-chroot "$TARGET" /bin/sh -c "addgroup '$USERNAME' audio 2>/dev/null || true"
+
+for group in wheel audio video render input; do
+    chroot "$TARGET" /bin/sh -c "addgroup -S '$group' 2>/dev/null || true"
+    chroot "$TARGET" /bin/sh -c "addgroup '$USERNAME' '$group' 2>/dev/null || true"
+done
 printf '%s\n' 'Set user password:'
 chroot "$TARGET" passwd "$USERNAME"
 printf '%s\n' 'Set root password:'
