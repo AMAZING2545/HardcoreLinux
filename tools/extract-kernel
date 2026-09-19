@@ -26,9 +26,7 @@ done
 tar -xf "$ARCHIVE" -C "$TMP"
 
 KERNEL=
-for pattern in \
-    'vmlinuz' 'vmlinuz-*' 'bzImage' 'Image' 'zImage' \
-    'kernel' 'kernel-*' 'linux' 'linux-*'; do
+for pattern in 'vmlinuz' 'vmlinuz-*' 'bzImage' 'Image' 'zImage'; do
     KERNEL=$(find "$TMP" -type f -name "$pattern" -print -quit)
     [ -n "$KERNEL" ] && break
 done
@@ -56,9 +54,10 @@ fi
 
 KERNEL_TYPE=$(file -b "$KERNEL" 2>/dev/null || true)
 case "$KERNEL_TYPE" in
-    *"Linux kernel"*) ;;
+    "Linux kernel x86 boot executable"*|    "Linux kernel ARM64 boot executable"*|    *"Linux kernel x86 boot executable bzImage"*)
+        ;;
     *)
-        echo "extract-kernel: selected file is not a Linux kernel: $KERNEL" >&2
+        echo "extract-kernel: selected file is not a supported Linux kernel: $KERNEL" >&2
         echo "extract-kernel: file type: $KERNEL_TYPE" >&2
         exit 1
         ;;
