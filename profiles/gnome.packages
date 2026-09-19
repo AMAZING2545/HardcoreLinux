@@ -4,6 +4,7 @@
 adwaita-fonts
 adwaita-icon-theme
 accountsservice
+sudo
 dconf
 desktop-file-utils
 elogind
