@@ -1,28 +1,108 @@
 #!/bin/sh
+set -u
 
-case "$1" in
-		"start")
-			if [ $(grep -c "$2" /system/tmp/services) == "0" ]; then
-				echo $2 >> /system/tmp/services
-			fi
-			;;
-		"stop")
-			echo "$(grep -v "$2" /system/tmp/services)" > /system/tmp/services
-			kill -9 "-$(pgrep -x "$(ls /system/services | grep $2)")"
-			;;
-		"info")
-			TMP=$(ls /system/services | grep "$2") 
-			echo "info of ${TMP:6}"
-			RUNNING=0
-			echo "status: $(
-					if [ $(grep -c "$2" /system/tmp/services) == "0" ]; then                                                                                         
-                                        	echo stopped
-                        		else
-						echo running
-						RUNNING=1
-					
-						echo '  PID USER  CPU_TIME CMD'
-						ps -e | grep "/system/services/$(ls /system/services | grep $2)" | grep -v grep
-						pstree $(pgrep -x "$(ls /system/services | grep $2)")
-					fi)"
+STATE=/system/tmp/services
+SERVICES=/system/services
+ENABLED=/system/enabled-services
+
+mkdir -p /system/tmp
+touch "$STATE" "$ENABLED"
+
+service_path() {
+    printf '%s/%s' "$SERVICES" "$1"
+}
+
+start_service() {
+    name="$1"
+    path=$(service_path "$name")
+    [ -x "$path" ] || { echo "initctl: unknown service: $name" >&2; return 1; }
+
+    if ! grep -qxF "$name" "$ENABLED"; then
+        printf '%s\n' "$name" >> "$ENABLED"
+    fi
+
+    if ! grep -qxF "$name" "$STATE"; then
+        printf '%s\n' "$name" >> "$STATE"
+    fi
+
+    if command -v pidof >/dev/null 2>&1 && pidof "$name" >/dev/null 2>&1; then
+        echo "$name is already running"
+        return 0
+    fi
+
+    setsid "$path" >/tmp/service-"$name".log 2>&1 &
+    echo "started $name"
+}
+
+stop_service() {
+    name="$1"
+    tmp=$(mktemp)
+    grep -vxF "$name" "$ENABLED" > "$tmp" || true
+    mv "$tmp" "$ENABLED"
+
+    tmp=$(mktemp)
+    grep -vxF "$name" "$STATE" > "$tmp" || true
+    mv "$tmp" "$STATE"
+
+    if command -v pkill >/dev/null 2>&1; then
+        pkill -TERM -f "^$SERVICES/$name$" 2>/dev/null || true
+    fi
+    echo "stopped $name"
+}
+
+info_service() {
+    name="$1"
+    path=$(service_path "$name")
+    [ -x "$path" ] || { echo "initctl: unknown service: $name" >&2; return 1; }
+    printf 'service: %s\n' "$name"
+    if grep -qxF "$name" "$ENABLED"; then
+        echo "enabled: yes"
+    else
+        echo "enabled: no"
+    fi
+    if command -v pidof >/dev/null 2>&1 && pidof "$name" >/dev/null 2>&1; then
+        echo "running: yes"
+        printf 'pid: '; pidof "$name"
+    else
+        echo "running: no"
+    fi
+}
+
+case "${1:-}" in
+    start)
+        [ -n "${2:-}" ] || { echo "usage: initctl start <service>"; exit 2; }
+        start_service "$2"
+        ;;
+    stop)
+        [ -n "${2:-}" ] || { echo "usage: initctl stop <service>"; exit 2; }
+        stop_service "$2"
+        ;;
+    restart)
+        [ -n "${2:-}" ] || { echo "usage: initctl restart <service>"; exit 2; }
+        stop_service "$2"
+        sleep 1
+        start_service "$2"
+        ;;
+    enable)
+        [ -n "${2:-}" ] || { echo "usage: initctl enable <service>"; exit 2; }
+        start_service "$2"
+        ;;
+    disable)
+        [ -n "${2:-}" ] || { echo "usage: initctl disable <service>"; exit 2; }
+        stop_service "$2"
+        ;;
+    info)
+        [ -n "${2:-}" ] || { echo "usage: initctl info <service>"; exit 2; }
+        info_service "$2"
+        ;;
+    list)
+        for service in "$SERVICES"/*; do
+            [ -x "$service" ] || continue
+            printf '%s\n' "${service##*/}"
+        done
+        ;;
+    *)
+        echo "usage: initctl start|stop|restart|enable|disable|info|list <service>"
+        exit 2
+        ;;
 esac

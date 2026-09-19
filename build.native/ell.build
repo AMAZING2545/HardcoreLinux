@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted ell source tree}"
+: "${YSPM_BIN:=yspm}"
+
+VERSION="${VERSION:-git}"
+ARCH="${ARCH:-x86_64}"
+ABI="${YSPM_ABI:-yspm-abi-1}"
+OUT="${OUTPUT:-ell-${VERSION}-${ARCH}.yspkg}"
+STAGE=$(mktemp -d)
+trap 'rm -rf "$STAGE"' EXIT
+
+cd "$dir"
+if [ -x ./bootstrap ]; then ./bootstrap; fi
+./configure --prefix=/usr
+make -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+make DESTDIR="$STAGE" install
+
+"$YSPM_BIN" build \
+  --root "$STAGE" \
+  --output "$OUT" \
+  --name ell \
+  --version "$VERSION" \
+  --description "Embedded Linux Library used by iwd" \
+  --abi "$ABI" \
+  --arch "$ARCH" \
+  --license LGPL-2.1
+echo "$OUT"

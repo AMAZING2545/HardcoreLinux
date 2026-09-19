@@ -1,0 +1,86 @@
+#!/bin/sh
+set -eu
+
+[ "$(id -u)" = 0 ] || {
+    echo "build-image: run as root" >&2
+    exit 1
+}
+
+[ "$#" -ge 3 ] || {
+    echo "usage: build-image <rootfs.tar> <kernel> <output.img> [size]" >&2
+    exit 2
+}
+
+ROOTFS=$1
+KERNEL=$2
+IMAGE=$3
+SIZE="${4:-2G}"
+
+for cmd in truncate sfdisk losetup mkfs.fat mkfs.ext4 mount umount tar blkid; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "build-image: missing command: $cmd" >&2
+        exit 1
+    }
+done
+
+[ -f "$ROOTFS" ] || { echo "missing rootfs: $ROOTFS" >&2; exit 1; }
+[ -f "$KERNEL" ] || { echo "missing kernel: $KERNEL" >&2; exit 1; }
+
+mkdir -p "$(dirname "$IMAGE")"
+rm -f "$IMAGE"
+truncate -s "$SIZE" "$IMAGE"
+
+printf 'label: gpt\nsize=512M, type=U\nsize=0, type=L\n' | sfdisk "$IMAGE"
+LOOP=$(losetup --find --show --partscan "$IMAGE")
+MNT=$(mktemp -d)
+ESP="${LOOP}p1"
+ROOT="${LOOP}p2"
+
+cleanup() {
+    set +e
+    umount "$MNT/boot/efi" 2>/dev/null
+    umount "$MNT" 2>/dev/null
+    losetup -d "$LOOP" 2>/dev/null
+    rm -rf "$MNT"
+}
+trap cleanup EXIT INT TERM
+
+sleep 1
+mkfs.fat -F 32 "$ESP" >/dev/null
+mkfs.ext4 -F "$ROOT" >/dev/null
+
+mount "$ROOT" "$MNT"
+mkdir -p "$MNT/boot/efi"
+mount "$ESP" "$MNT/boot/efi"
+tar -xpf "$ROOTFS" -C "$MNT"
+cp "$ROOTFS" "$MNT/rootfs.tar"
+mkdir -p "$MNT/boot"
+cp "$KERNEL" "$MNT/boot/vmlinuz"
+
+ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
+
+command -v grub-install >/dev/null 2>&1 || {
+    echo "build-image: grub-install is required" >&2
+    exit 1
+}
+
+grub-install \
+    --target=x86_64-efi \
+    --efi-directory="$MNT/boot/efi" \
+    --boot-directory="$MNT/boot" \
+    --bootloader-id=HardcoreLinux \
+    --removable \
+    --no-nvram \
+    --recheck
+
+mkdir -p "$MNT/boot/grub"
+cat > "$MNT/boot/grub/grub.cfg" <<EOF
+search --no-floppy --fs-uuid --set=root $ROOT_UUID
+set timeout=3
+menuentry 'Hardcore Linux' {
+    linux /boot/vmlinuz root=UUID=$ROOT_UUID rw init=/etc/init
+}
+EOF
+
+sync
+echo "$IMAGE"

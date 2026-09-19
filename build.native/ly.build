@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted ly source tree}"
+: "${YSPM_BIN:=yspm}"
+
+VERSION="${VERSION:-1.0.3}"
+ARCH="${ARCH:-x86_64}"
+ABI="${YSPM_ABI:-yspm-abi-1}"
+OUT="${OUTPUT:-ly-${VERSION}-${ARCH}.yspkg}"
+STAGE=$(mktemp -d)
+trap 'rm -rf "$STAGE"' EXIT
+
+command -v zig >/dev/null 2>&1 || {
+    echo "ly.build: Zig is required" >&2
+    exit 1
+}
+
+cd "$dir"
+zig build -Doptimize=ReleaseFast
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+DESTDIR="$STAGE" zig build install
+
+"$YSPM_BIN" build \
+  --root "$STAGE" \
+  --output "$OUT" \
+  --name ly \
+  --version "$VERSION" \
+  --description "Lightweight TUI display manager" \
+  --abi "$ABI" \
+  --arch "$ARCH" \
+  --license WTFPL
+echo "$OUT"

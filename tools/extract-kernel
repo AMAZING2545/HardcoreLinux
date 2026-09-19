@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+[ "$#" -ge 2 ] || {
+    echo "usage: extract-kernel <archive.tar> <output>" >&2
+    exit 2
+}
+
+ARCHIVE=$1
+OUTPUT=$2
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+tar -xf "$ARCHIVE" -C "$TMP"
+
+KERNEL=$(find "$TMP" -type f \( \
+    -name 'vmlinuz' -o \
+    -name 'vmlinuz-*' -o \
+    -name 'bzImage' -o \
+    -name 'Image' \
+\) | head -n 1)
+
+[ -n "$KERNEL" ] || {
+    echo "extract-kernel: no kernel image found in $ARCHIVE" >&2
+    exit 1
+}
+
+cp "$KERNEL" "$OUTPUT"
+chmod 0644 "$OUTPUT"
+echo "$OUTPUT"
