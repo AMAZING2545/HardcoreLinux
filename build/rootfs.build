@@ -88,8 +88,9 @@ chmod 0755 "$ROOTFS/usr/bin/yspm"
 
 cp "$REPO_DIR/tools/hc-installer" "$ROOTFS/usr/sbin/hc-installer"
 cp "$REPO_DIR/tools/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-desktop"
+cp "$REPO_DIR/tools/hc-setup-gnome" "$ROOTFS/usr/sbin/hc-setup-gnome"
 cp "$REPO_DIR/tools/bench-system" "$ROOTFS/usr/bin/hc-bench"
-chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/bin/hc-bench"
+chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-gnome" "$ROOTFS/usr/bin/hc-bench"
 
 mkdir -p "$ROOTFS/etc/ssl/certs"
 if command -v wget >/dev/null 2>&1; then
