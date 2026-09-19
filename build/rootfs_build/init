@@ -1,75 +1,92 @@
 #!/bin/sh
-clear
-echo Hardcore init v1.4.2
+set -u
 
-mount -t proc proc /proc
-mount -t sysfs sys /sys
-mkdir -p /dev/pts
-mount -t devpts devpts /dev/pts
-mount -t tmpfs tmpfs /run
-mount -t tmpfs tmpfs /tmp
-chmod 1777 /tmp
-mkdir /tmp/system
-mount --bind /tmp/system /system/tmp
-mount /dev/sda1 /system/esp
+echo "Hardcore Linux init"
 
-$(cat /etc/profile)
+mount -t proc proc /proc 2>/dev/null || true
+mount -t sysfs sys /sys 2>/dev/null || true
+mkdir -p /dev/pts /dev/mqueue /run /tmp /system/tmp
+mount -t devpts devpts /dev/pts 2>/dev/null || true
+mount -t tmpfs tmpfs /run 2>/dev/null || true
+mount -t tmpfs tmpfs /tmp 2>/dev/null || true
+chmod 1777 /tmp 2>/dev/null || true
 
-echo [  ok  ] mounted VFS nodes
-(sleep 1
-echo "/sbin/mdev" > /proc/sys/kernel/hotplug
-mdev -s
-echo [  ok  ] started mdev
-) &
+[ -f /etc/profile ] && . /etc/profile
+[ -f /etc/hostname ] && hostname "$(cat /etc/hostname)" 2>/dev/null || true
 
-echo 'starting core drivers in /system/drivers/modprobe'
-for driver in $(sort -n /system/drivers/modprobe); do
-        echo [  ok  ] loading driver ${driver:6} #format=xxxxx-drivername
-        /sbin/modprobe ${driver:6}
-done
+echo "[  ok  ] mounted VFS nodes"
 
-for i in 1 2 3 4 5 6; do
-	(while true ; do
-                echo [  ok  ] started login screen at tty$i
-                /sbin/getty 0 tty$i
-        	echo stopped tty$1
-	done
-	) &
-done
+if [ -w /proc/sys/kernel/hotplug ]; then
+    echo "/sbin/mdev" > /proc/sys/kernel/hotplug
+fi
+if command -v mdev >/dev/null 2>&1; then
+    mdev -s >/dev/null 2>&1 || true
+    echo "[  ok  ] populated /dev"
+fi
 
-chmod 744 -R /system/services
-chmod 744 -R /system/scripts
+if [ -f /system/drivers/modprobe ] && command -v modprobe >/dev/null 2>&1; then
+    echo "loading configured kernel modules"
+    while IFS= read -r driver; do
+        [ -n "$driver" ] || continue
+        driver="${driver#??????}"
+        echo "[  ok  ] loading $driver"
+        modprobe "$driver" 2>/dev/null || echo "[ warn ] could not load $driver"
+    done < /system/drivers/modprobe
+fi
 
-echo 'executing scripts in /system/scripts'
+if [ -f /system/tmp/services ]; then
+    :
+else
+    : > /system/tmp/services
+fi
 
-for script in $(ls /system/scripts); do
-        echo [  ok  ] executing script ${script:6} #format=xxxxx-scriptname
-        setsid /system/scripts/$script &
+echo "executing boot scripts"
+if [ -d /system/scripts ]; then
+    for script in /system/scripts/*; do
+        [ -f "$script" ] || continue
+        chmod 755 "$script" 2>/dev/null || true
+        echo "[  ok  ] script ${script##*/}"
+        setsid "$script" >/dev/null 2>&1 &
         sleep 0.05
+    done
+fi
+
+start_service() {
+    name="$1"
+    service="/system/services/$name"
+    [ -x "$service" ] || return 1
+    if grep -qxF "$name" /system/tmp/services 2>/dev/null; then
+        return 0
+    fi
+    echo "$name" >> /system/tmp/services
+    echo "[  ok  ] starting service $name"
+    setsid "$service" >/tmp/service-"$name".log 2>&1 &
+}
+
+echo "starting enabled services"
+if [ -f /system/enabled-services ]; then
+    while IFS= read -r service; do
+        [ -n "$service" ] || continue
+        start_service "$service" || echo "[ warn ] service unavailable: $service"
+    done < /system/enabled-services
+fi
+
+# ly can replace the traditional getty loop when installed.
+if command -v ly >/dev/null 2>&1; then
+    echo "[  ok  ] starting ly"
+    exec ly
+fi
+
+echo "starting tty login"
+for tty in tty1 tty2 tty3 tty4 tty5 tty6; do
+    (
+        while :; do
+            getty 0 "$tty"
+            sleep 1
+        done
+    ) &
 done
 
-echo 'starting services in /system/services'
-
-for service in $(ls /system/services); do
-        (while true; do
-                while [ $(cat /system/tmp/services | grep -c ${service:6}) == "0"] ; do
-			sleep 2
-		done
-                echo [  ok  ] started service ${service:6} #format=xxxxx-servicename
-               	setsid /system/services/$service
-		echo [  bad  ] service $service died, respawning
-		if [ $((exhausted)) -ge 10 ]; then
-			echo [  evil  ] $service is locked up, use initctl to manually restart SERVICE_UNSTABLE
-			initctl stop $service
-	                while [ $(cat /system/tmp/services | grep -c ${service:6}) == "0"] ; do
-        	                sleep 2
-                	done
-			exhausted=0
-		fi
-        done) &
-done
-
-
-while true; do
-	sleep 100
+while :; do
+    sleep 100
 done
