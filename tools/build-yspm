@@ -18,7 +18,10 @@ git -C "$YSPM_SOURCE_DIR" fetch --depth 1 origin "$YSPM_REF" >/dev/null 2>&1 || 
 git -C "$YSPM_SOURCE_DIR" checkout --force "$YSPM_REF"
 
 mkdir -p "${YSPM_OUTPUT%/*}"
-CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$YSPM_OUTPUT" "$YSPM_SOURCE_DIR/cmd/yspm"
+(
+    cd "$YSPM_SOURCE_DIR"
+    CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$YSPM_OUTPUT" ./cmd/yspm
+)
 
 chmod 0755 "$YSPM_OUTPUT"
 printf '%s\n' "$YSPM_OUTPUT"
