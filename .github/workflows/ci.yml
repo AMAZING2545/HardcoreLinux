@@ -183,11 +183,7 @@ jobs:
             exit 1
           }
 
-          gzip -t iso-root/boot/initramfs.img || {
-            echo "initramfs gzip validation failed"
-            exit 1
-          }
-          gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null || {
+          cpio -it < iso-root/boot/initramfs.img > initramfs.list 2>/dev/null || {
             echo "initramfs cpio listing failed"
             exit 1
           }
