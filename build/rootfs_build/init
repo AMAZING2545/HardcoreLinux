@@ -20,9 +20,13 @@ echo "[  ok  ] mounted VFS nodes"
 if [ -w /proc/sys/kernel/hotplug ]; then
     echo "/sbin/mdev" > /proc/sys/kernel/hotplug
 fi
-if command -v mdev >/dev/null 2>&1; then
+if command -v udevadm >/dev/null 2>&1 && pidof udevd >/dev/null 2>&1; then
+    udevadm trigger --action=add >/dev/null 2>&1 || true
+    udevadm settle >/dev/null 2>&1 || true
+    echo "[  ok  ] populated /dev with udev"
+elif command -v mdev >/dev/null 2>&1; then
     mdev -s >/dev/null 2>&1 || true
-    echo "[  ok  ] populated /dev"
+    echo "[  ok  ] populated /dev with mdev"
 fi
 
 if [ -f /system/drivers/modprobe ] && command -v modprobe >/dev/null 2>&1; then
