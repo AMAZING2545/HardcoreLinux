@@ -119,6 +119,7 @@ jobs:
 
           xorriso -indev "$ISO" -report_el_torito plain
           sha256sum "$ISO" > "$ISO.sha256"
+          sha256sum -c "$ISO.sha256"
 
       - name: Generate ISO build provenance
         uses: actions/attest@v4
