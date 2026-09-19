@@ -28,6 +28,26 @@ while IFS= read -r package; do
     install_required "$package"
 done < "$PROFILE"
 
+printf 'Install the common workstation applications? [Y/n]: '
+read -r answer || true
+case "${answer:-y}" in
+    n|N) INSTALL_APPS=0 ;;
+    *) INSTALL_APPS=1 ;;
+esac
+
+if [ "$INSTALL_APPS" = 1 ]; then
+    APP_PROFILE=/usr/share/hardcore-linux/profiles/default-applications.packages
+    if [ -f "$APP_PROFILE" ]; then
+        while IFS= read -r package; do
+            case "$package" in
+                ''|'#'*) continue ;;
+            esac
+            printf 'Installing application %s...\n' "$package"
+            yspm install "$package" --yes || printf '%s\n' "  [ warn ] application unavailable: $package"
+        done < "$APP_PROFILE"
+    fi
+fi
+
 # Desktop services and integration
 for package in gdm pipewire wireplumber NetworkManager bluez gnome-bluetooth; do
     printf 'Installing %s...\n' "$package"
