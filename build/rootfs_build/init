@@ -74,9 +74,15 @@ if [ -f /etc/hc-live ]; then
     setsid sh /usr/sbin/hc-installer </dev/tty1 >/dev/tty1 2>&1 &
 fi
 
-if command -v ly >/dev/null 2>&1 && [ ! -f /etc/hc-live ]; then
-    echo "[  ok  ] starting ly"
-    exec ly
+if [ ! -f /etc/hc-live ]; then
+    if command -v gdm >/dev/null 2>&1; then
+        echo "[  ok  ] starting gdm"
+        exec gdm
+    fi
+    if command -v ly >/dev/null 2>&1; then
+        echo "[  ok  ] starting ly"
+        exec ly
+    fi
 fi
 
 echo "starting tty login"

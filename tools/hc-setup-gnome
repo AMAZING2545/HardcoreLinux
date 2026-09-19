@@ -1,0 +1,74 @@
+#!/bin/sh
+set -eu
+
+die() { printf 'hc-setup-gnome: %s\n' "$*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || die "run as root"
+command -v yspm >/dev/null 2>&1 || die "yspm is not installed"
+
+PROFILE=/usr/share/hardcore-linux/profiles/gnome.packages
+[ -f "$PROFILE" ] || die "GNOME package profile is missing: $PROFILE"
+
+printf '\033c'
+printf '%s\n' 'Hardcore Linux GNOME setup'
+printf '%s\n\n' 'This installs the complete GNOME desktop profile using yspm.'
+
+yspm update
+
+install_required() {
+    package="$1"
+    printf 'Installing %s...\n' "$package"
+    yspm install "$package" --yes || die "required package failed: $package"
+    printf '%s\n' "  [ ok ] $package"
+}
+
+while IFS= read -r package; do
+    case "$package" in
+        ''|'#'*) continue ;;
+    esac
+    install_required "$package"
+done < "$PROFILE"
+
+# Desktop services and integration
+for package in gdm pipewire wireplumber NetworkManager bluez gnome-bluetooth; do
+    printf 'Installing %s...\n' "$package"
+    yspm install "$package" --yes || printf '%s\n' "  [ warn ] optional package unavailable: $package"
+done
+
+mkdir -p /etc/profile.d /etc/default /system/services /system/tmp
+: > /system/tmp/services
+
+cat > /etc/profile.d/20-desktop.sh <<'EOF'
+export XDG_CURRENT_DESKTOP=GNOME
+export XDG_SESSION_DESKTOP=gnome
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+
+if command -v pipewire >/dev/null 2>&1 && ! pidof pipewire >/dev/null 2>&1; then
+    pipewire >/tmp/pipewire.log 2>&1 &
+fi
+if command -v wireplumber >/dev/null 2>&1 && ! pidof wireplumber >/dev/null 2>&1; then
+    wireplumber >/tmp/wireplumber.log 2>&1 &
+fi
+if command -v pipewire-pulse >/dev/null 2>&1 && ! pidof pipewire-pulse >/dev/null 2>&1; then
+    pipewire-pulse >/tmp/pipewire-pulse.log 2>&1 &
+fi
+EOF
+
+cat > /etc/default/hardcore-desktop <<'EOF'
+DESKTOP=GNOME
+DISPLAY_MANAGER=gdm
+AUDIO=pipewire
+NETWORK=NetworkManager
+EOF
+
+if command -v initctl >/dev/null 2>&1; then
+    initctl enable dbus || true
+    initctl enable elogind || true
+    initctl enable polkit || true
+    initctl enable NetworkManager || true
+    initctl enable bluetooth || true
+fi
+
+printf '\n%s\n' 'GNOME setup completed.'
+printf '%s\n' 'Reboot to start the graphical login screen.'

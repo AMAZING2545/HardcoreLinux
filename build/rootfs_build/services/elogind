@@ -1,0 +1,8 @@
+#!/bin/sh
+for daemon in /usr/libexec/elogind /usr/lib/elogind/elogind /usr/sbin/elogind; do
+    if [ -x "$daemon" ]; then
+        exec "$daemon"
+    fi
+done
+echo "elogind: daemon not found" >&2
+exit 1
