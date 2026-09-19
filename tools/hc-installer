@@ -88,7 +88,7 @@ case "$MODE" in
         if yesno "Format the root partition as ext4?" "n"; then
             mkfs.ext4 -F "$ROOT"
         fi
-        ;?;
+        ;;
     *) die "unknown installation mode" ;;
 esac
 
