@@ -49,7 +49,7 @@ if [ "$INSTALL_APPS" = 1 ]; then
 fi
 
 # Desktop services and integration
-for package in gdm pipewire wireplumber NetworkManager iwd bluez gnome-bluetooth upower power-profiles-daemon cups; do
+for package in gdm pipewire wireplumber NetworkManager iwd bluez gnome-bluetooth upower power-profiles-daemon cups fwupd; do
     printf 'Installing %s...\n' "$package"
     yspm install "$package" --yes || printf '%s\n' "  [ warn ] optional package unavailable: $package"
 done
