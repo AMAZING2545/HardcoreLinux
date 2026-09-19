@@ -1,39 +1,302 @@
-# HARDCORE LINUX, a lighweight independent linux rootfs and distro
+# Hardcore Linux
 
-### installation: see wiki, or download the .img directly if you're impatient
+A small, independent Linux distribution built around musl, BusyBox, a shell-based init system, and yspm.
 
-### goals
-most linux distros nowadays can start at 2+ GB ISO, the most notable example being Ubuntu with a 6GB ISO for the full GUI variant
-or Omarchy (which does not even try to be minimal)
+## Project direction
 
-Some distros try, like Arch delivers a 700MB base rootfs; and some even harder, like Alpine, and some tried too hard, like  
-TinyCore (impressive for 17MB, but almost nothing works)
+Hardcore Linux aims to stay minimal without turning the base system into an unusable proof of concept.
 
-Hardcore tries to be minimal while not giving away functionality.
+The base system is intentionally small. Graphical environments and larger applications are installed later from the yspm repository.
 
-Hardcore, unlike many distros, uses musl libc instead glibc, which is lighter, safer and strictly POSIX
+The project uses:
 
-the init system is a shell script that launches scripts and services from /system. a shell script is more auditable than a binary
+- musl libc
+- BusyBox
+- a small shell init system
+- service scripts under /system
+- yspm for native package management
+- UEFI boot support
+- Sway as the primary desktop path
+- labwc as an alternative desktop path
 
-the package manager is also a script
+## What changed
 
-in 700MB you can fit the base Hardcore system, GCC, G++, LLVM, MESA, Python, many dependencies for Wayland, Wayland itself, a 
-Compositor, A terminal emulator with many terminal apps
+The current development line adds the pieces needed for a usable distribution rather than only a root filesystem:
 
-All of this with 110MB of idle memory usage at maximum (can go to 20/30MB, but free RAM is wasted RAM)
+- interactive installer
+- guided or manual partitioning
+- GRUB and systemd-boot installation paths
+- hostname and user configuration
+- automated desktop setup
+- Sway and labwc
+- optional Ly display manager
+- PipeWire and WirePlumber integration
+- iwd wireless service
+- D-Bus service
+- architecture-independent network bootstrap
+- native .yspkg package recipes
+- yspm bootstrap integration
+- legacy package migration into a native yspm repository
+- release SHA-256 checksums
+- automated release image builds
+- reproducible benchmark methodology
+- installation and desktop documentation
 
-the repository only contains most software that you would need to compile your own(if you ever need rust, download it from there "https://static.rust-lang.org/dist/rust-1.97.1-x86_64-unknown-linux-musl.tar.xz")
+## yspm
 
-### does Hardcore have a desktop environment?
+yspm is the package manager used by the distribution.
 
-yes and no
+The base image contains:
 
-while the base system lacks wayland altogether, it can be installed via the sway package, which will prompt to install a lot
-of dependencies
+~~~text
+/usr/bin/yspm
+/etc/yspm/env
+/etc/profile.d/yspm.sh
+/var/lib/yspm
+/var/cache/yspm
+~~~
 
-you will also need udev for libinput to work. after installing udev you will need to create a script and launch udevd and udevadm
+After installation:
 
-then you need to set the renderer to pixman and not opengl(which will crash because wlroots does not like llvmpipe)
+~~~bash
+sudo yspm update
+sudo yspm install sway
+sudo yspm upgrade
+~~~
 
-### report bugs
-if you ever find a bug or request a feature, start a issue at https://github.com/AMAZING2545/HardcoreLinux/issues
+The distribution does not maintain a second package manager.
+
+The existing tar archive repository is still kept during the migration to native yspkg packages. The release workflow can convert the legacy packages, build a yspm index, and publish the native packages with the release.
+
+## Build the root filesystem
+
+The existing build system keeps the bootstrap artifacts in the repository.
+
+Build the yspm binary:
+
+~~~bash
+sh tools/build-yspm
+~~~
+
+Then build the root filesystem:
+
+~~~bash
+sudo YSPM_BIN=/tmp/yspm sh build/rootfs.build
+~~~
+
+Output:
+
+~~~text
+build/rootfs.tar
+~~~
+
+The rootfs builder no longer depends on the old flashman package manager.
+
+## Build a bootable image
+
+Extract a kernel from the standalone kernel archive:
+
+~~~bash
+sudo sh tools/extract-kernel linux_UEFI_standalone.tar /tmp/vmlinuz
+~~~
+
+Build a UEFI disk image:
+
+~~~bash
+sudo sh tools/build-image \
+  build/rootfs.tar \
+  /tmp/vmlinuz \
+  HardcoreLinux.img \
+  2G
+~~~
+
+The image contains the root filesystem, kernel, GRUB, and a copy of rootfs.tar so it can act as an installer environment.
+
+## Install
+
+Boot the image on a UEFI x86_64 machine and run:
+
+~~~bash
+sh /usr/sbin/hc-installer
+~~~
+
+The installer asks for:
+
+- target disk or partitions
+- filesystem formatting
+- hostname
+- first user
+- passwords
+- yspm repository
+- bootloader
+
+See [docs/INSTALL.md](docs/INSTALL.md).
+
+## Desktop setup
+
+After the first boot:
+
+~~~bash
+sudo sh /usr/sbin/hc-setup-desktop
+~~~
+
+The wizard can install:
+
+~~~text
+Sway
+labwc
+foot
+wofi
+waybar
+ly
+PipeWire
+WirePlumber
+iwd
+udev
+D-Bus
+~~~
+
+See [docs/DESKTOP.md](docs/DESKTOP.md).
+
+## Init and services
+
+The init system is intentionally small and auditable.
+
+System services live under:
+
+~~~text
+/system/services
+~~~
+
+Boot scripts live under:
+
+~~~text
+/system/scripts
+~~~
+
+Configured services are enabled through:
+
+~~~text
+/system/enabled-services
+~~~
+
+The service control command is:
+
+~~~bash
+initctl start <service>
+initctl stop <service>
+initctl restart <service>
+initctl enable <service>
+initctl disable <service>
+initctl info <service>
+initctl list
+~~~
+
+The init system can start Ly automatically when it is installed; otherwise it falls back to tty gettys.
+
+## Native packages
+
+Native packages use:
+
+~~~text
+.yspkg
+~~~
+
+The format contains:
+
+~~~text
+metadata.json
+scripts/
+  preinstall
+  postinstall
+  preremove
+  postremove
+root/
+  usr/
+  etc/
+  var/
+~~~
+
+Package recipes in build.native use yspm to produce native packages.
+
+See [repo/README.md](repo/README.md) and the yspm project for the package metadata contract.
+
+## Binary repository
+
+The repository currently contains legacy binary archives.
+
+The migration tool can create a native yspm repository:
+
+~~~bash
+python3 tools/migrate-legacy-repo.py \
+  --input . \
+  --output repo-yspm/releases/1 \
+  --base-url https://example.org/hardcorelinux/releases/1 \
+  --yspm /tmp/yspm
+~~~
+
+A release can then publish:
+
+~~~text
+repo-index.json
+*.yspkg
+SHA256SUMS
+HardcoreLinux-<tag>.img
+~~~
+
+## Integrity
+
+Release images and repository indexes receive SHA-256 checksums.
+
+For local release files:
+
+~~~bash
+sh tools/hc-release-checksums SHA256SUMS .
+~~~
+
+Repository metadata can be signed with the Ed25519 signing functionality provided by yspm.
+
+## CI/CD
+
+Pull requests and pushes run validation for:
+
+- shell syntax
+- ShellCheck errors
+- Python syntax
+
+Version tags matching v* trigger the release pipeline.
+
+The release workflow:
+
+1. builds yspm
+2. builds the root filesystem
+3. extracts the kernel
+4. creates a UEFI image
+5. converts legacy packages to yspkg
+6. generates the native repository index
+7. publishes packages and the image
+8. publishes SHA-256 checksums
+
+## Benchmarks
+
+The repository does not publish invented performance numbers.
+
+Collect local data with:
+
+~~~bash
+sudo sh /usr/bin/hc-bench
+~~~
+
+See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+## Documentation
+
+- [Installation](docs/INSTALL.md)
+- [Desktop Setup](docs/DESKTOP.md)
+- [Benchmarks](docs/BENCHMARKS.md)
+- [Showcase](docs/SHOWCASE.md)
+- [Native Repository](repo/README.md)
+
+## License
+
+GNU General Public License v2.0.
