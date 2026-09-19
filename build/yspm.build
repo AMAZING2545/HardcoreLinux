@@ -1,0 +1,38 @@
+#!/bin/bash
+
+wd=$(pwd)
+
+rm -r /tmp/yspm-build /tmp/go 2>/dev/null
+mkdir -p /tmp/yspm-build /tmp/go
+
+curl -L --fail --silent --show-error \
+  https://go.dev/dl/go1.25.13.linux-amd64.tar.gz \
+  -o /tmp/go.tar.gz
+
+echo "39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3  /tmp/go.tar.gz" | sha256sum -c -
+
+tar -xzf /tmp/go.tar.gz -C /tmp/go --strip-components=1
+
+git clone --depth 1 --branch v0.2.0 \
+  https://github.com/Yassine-Jemi01/yspm.git \
+  /tmp/yspm-build
+
+mkdir -p /tmp/stage/usr/bin
+mkdir -p /tmp/stage/etc/installer/yspm
+
+cd /tmp/yspm-build
+
+CGO_ENABLED=0 \
+  /tmp/go/bin/go build \
+  -trimpath \
+  -buildvcs=false \
+  -ldflags="-s -w" \
+  -o /tmp/stage/usr/bin/yspm \
+  ./cmd/yspm
+
+echo "yspm 0.2.0 Go x86_64" > /tmp/stage/etc/installer/yspm/pkinfo
+
+cd "$wd"
+
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .
