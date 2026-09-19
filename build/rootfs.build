@@ -45,6 +45,7 @@ mkdir -p "$ROOTFS/etc" "$ROOTFS/usr/bin" "$ROOTFS/usr/sbin" "$ROOTFS/sbin"
 mkdir -p "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"
 mkdir -p "$ROOTFS/system/tmp" "$ROOTFS/var/lib/yspm" "$ROOTFS/var/cache/yspm"
 mkdir -p "$ROOTFS/etc/yspm" "$ROOTFS/etc/profile.d" "$ROOTFS/run/user"
+mkdir -p "$ROOTFS/usr/share/hardcore-linux/profiles"
 
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
 cp "$BUILD_DIR/rootfs_build/initctl" "$ROOTFS/sbin/initctl"
@@ -55,6 +56,8 @@ fi
 if [ -d "$BUILD_DIR/rootfs_build/drivers" ]; then
     cp -a "$BUILD_DIR/rootfs_build/drivers/." "$ROOTFS/system/drivers/"
 fi
+cp "$REPO_DIR/profiles/gnome.packages" "$ROOTFS/usr/share/hardcore-linux/profiles/gnome.packages"
+cp "$REPO_DIR/profiles/minimal-desktop.packages" "$ROOTFS/usr/share/hardcore-linux/profiles/minimal-desktop.packages"
 chmod 0755 "$ROOTFS/etc/init" "$ROOTFS/sbin/initctl"
 for tree in "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"; do
     if [ -d "$tree" ]; then
@@ -63,7 +66,10 @@ for tree in "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/d
         done
     fi
 done
-printf '%s\n' 'dbus' > "$ROOTFS/system/enabled-services"
+printf '%s\n' 'dbus
+elogind
+polkit
+NetworkManager' > "$ROOTFS/system/enabled-services"
 : > "$ROOTFS/system/tmp/services"
 
 if [ -n "${YSPM_BIN:-}" ]; then
