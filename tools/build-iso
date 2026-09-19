@@ -15,7 +15,7 @@ ROOTFS=$1
 KERNEL=$2
 OUTPUT=$3
 
-for cmd in tar cpio gzip grub-mkrescue mktemp find cp mkdir chmod; do
+for cmd in tar cpio gzip grub-mkrescue grub-mkstandalone mkfs.fat mmd mcopy mktemp find cp mkdir chmod truncate; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "build-iso: missing command: $cmd" >&2
         exit 1
@@ -36,7 +36,7 @@ mkdir -p "$(dirname "$OUTPUT")"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
-mkdir -p "$WORK/live/boot" "$WORK/iso/boot/grub"
+mkdir -p "$WORK/live/boot" "$WORK/iso/boot/grub" "$WORK/esp"
 
 tar -xpf "$ROOTFS" -C "$WORK/live"
 cp "$KERNEL" "$WORK/live/boot/vmlinuz"
@@ -60,6 +60,23 @@ chmod 1777 /tmp 2>/dev/null || true
 exec /etc/init
 EOF
 chmod 0755 "$WORK/live/init"
+
+cat > "$WORK/installed-grub.cfg" <<'EOF'
+search --no-floppy --label --set=root OBSIDIAN
+linux /boot/vmlinuz root=LABEL=OBSIDIAN rw init=/etc/init
+boot
+EOF
+
+grub-mkstandalone     -O x86_64-efi     -o "$WORK/BOOTX64.EFI"     "boot/grub/grub.cfg=$WORK/installed-grub.cfg"
+chmod 0644 "$WORK/BOOTX64.EFI"
+cp "$WORK/BOOTX64.EFI" "$WORK/live/boot/BOOTX64.EFI"
+
+truncate -s 128M "$WORK/esp/efi.img"
+mkfs.fat -F 32 -n OBSIDIAN "$WORK/esp/efi.img" >/dev/null
+mmd -i "$WORK/esp/efi.img" ::/EFI
+mmd -i "$WORK/esp/efi.img" ::/EFI/BOOT
+mcopy -i "$WORK/esp/efi.img" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
+cp "$WORK/esp/efi.img" "$WORK/live/boot/efi.img"
 
 (
     cd "$WORK/live"
