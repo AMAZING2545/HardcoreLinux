@@ -15,7 +15,7 @@ ROOTFS=$1
 KERNEL=$2
 OUTPUT=$3
 
-for cmd in tar cpio gzip grub-mkrescue grub-mkstandalone mkfs.fat mmd mcopy mktemp find cp mkdir chmod truncate; do
+for cmd in tar cpio gzip grub-mkrescue grub-mkstandalone mkfs.fat mmd mcopy mktemp find cp mkdir chmod truncate file; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "build-iso: missing command: $cmd" >&2
         exit 1
@@ -40,26 +40,116 @@ mkdir -p "$WORK/live/boot" "$WORK/iso/boot/grub" "$WORK/esp"
 
 tar -xpf "$ROOTFS" -C "$WORK/live"
 cp "$KERNEL" "$WORK/live/boot/vmlinuz"
-cp "$ROOTFS" "$WORK/live/rootfs.tar"
 
-cat > "$WORK/live/init" <<'EOF'
+cat > "$WORK/initramfs-init" <<'EOF'
 #!/bin/sh
 set -u
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
-
-mkdir -p /dev/pts /dev/mqueue /run /tmp
+mkdir -p /dev/pts /dev/mqueue /run /tmp /isofs /newroot
 mount -t devpts devpts /dev/pts 2>/dev/null || true
 mount -t mqueue mqueue /dev/mqueue 2>/dev/null || true
 mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
 
-exec /etc/init
+mount_iso() {
+    for dev in \
+        /dev/sr* /dev/cdrom \
+        /dev/sd* /dev/vd* /dev/xvd* \
+        /dev/mmcblk* /dev/nvme*n*; do
+        [ -b "$dev" ] || continue
+        if /bin/busybox mount -t iso9660 -o ro "$dev" /isofs 2>/dev/null; then
+            if [ -f /isofs/boot/vmlinuz ] && [ -f /isofs/live/etc/init ]; then
+                echo "[  ok  ] mounted live ISO from $dev"
+                return 0
+            fi
+            /bin/busybox umount /isofs 2>/dev/null || true
+        fi
+    done
+    return 1
+}
+
+found=0
+i=0
+while [ "$i" -lt 30 ]; do
+    if mount_iso; then
+        found=1
+        break
+    fi
+    i=$((i + 1))
+    /bin/busybox sleep 1
+done
+
+[ "$found" -eq 1 ] || {
+    echo "[fail ] could not find a mountable Obsidian Core Linux ISO" >&2
+    exec /bin/busybox sh
+}
+
+mkdir -p /run/merged /run/upper /run/work /run/merged/run/iso
+if ! /bin/busybox mount -t overlay overlay -o lowerdir=/isofs/live,upperdir=/run/upper,workdir=/run/work /run/merged; then
+    echo "[fail ] could not mount OverlayFS" >&2
+    exec /bin/busybox sh
+fi
+
+mkdir -p /run/merged/proc /run/merged/sys /run/merged/dev
+/bin/busybox mount --bind /proc /run/merged/proc 2>/dev/null || {
+    echo "[fail ] could not expose /proc to live root" >&2
+    exec /bin/busybox sh
+}
+/bin/busybox mount --bind /sys /run/merged/sys 2>/dev/null || {
+    echo "[fail ] could not expose /sys to live root" >&2
+    exec /bin/busybox sh
+}
+/bin/busybox mount --bind /dev /run/merged/dev 2>/dev/null || {
+    echo "[fail ] could not expose /dev to live root" >&2
+    exec /bin/busybox sh
+}
+
+if ! /bin/busybox mount --bind /isofs /run/merged/run/iso; then
+    echo "[fail ] could not keep the ISO mounted for the installer" >&2
+    exec /bin/busybox sh
+fi
+
+echo "[  ok  ] entering live root"
+exec /bin/busybox chroot /run/merged /etc/init
 EOF
-chmod 0755 "$WORK/live/init"
+chmod 0755 "$WORK/initramfs-init"
+
+mkdir -p "$WORK/initramfs/bin" "$WORK/initramfs/lib" "$WORK/initramfs/dev" "$WORK/initramfs/proc" "$WORK/initramfs/sys" "$WORK/initramfs/run" "$WORK/initramfs/tmp"
+
+INITRAMFS_BUSYBOX="${INITRAMFS_BUSYBOX:-}"
+
+if [ -z "$INITRAMFS_BUSYBOX" ]; then
+    for candidate in /usr/bin/busybox /bin/busybox; do
+        [ -x "$candidate" ] || continue
+        if file -b "$candidate" | grep -qi 'statically linked'; then
+            INITRAMFS_BUSYBOX="$candidate"
+            break
+        fi
+    done
+fi
+
+if [ -z "$INITRAMFS_BUSYBOX" ]; then
+    echo "build-iso: no statically linked BusyBox found for initramfs" >&2
+    echo "build-iso: install busybox-static or set INITRAMFS_BUSYBOX" >&2
+    exit 1
+fi
+
+mkdir -p "$WORK/initramfs/bin"
+cp -L "$INITRAMFS_BUSYBOX" "$WORK/initramfs/bin/busybox"
+chmod 0755 "$WORK/initramfs/bin/busybox"
+
+
+ln -s busybox "$WORK/initramfs/bin/sh"
+ln -s busybox "$WORK/initramfs/init"
+
+(
+    cd "$WORK/initramfs"
+    find . -print | cpio -o -H newc 2>/dev/null | gzip -1 > "$WORK/iso/boot/initramfs.img"
+)
 
 cat > "$WORK/installed-grub.cfg" <<'EOF'
 search --no-floppy --label --set=root OBSIDIAN
@@ -78,14 +168,13 @@ mmd -i "$WORK/esp/efi.img" ::/EFI/BOOT
 mcopy -i "$WORK/esp/efi.img" "$WORK/BOOTX64.EFI" ::/EFI/BOOT/BOOTX64.EFI
 cp "$WORK/esp/efi.img" "$WORK/live/boot/efi.img"
 
-(
-    cd "$WORK/live"
-    find . -print | cpio -o -H newc 2>/dev/null | gzip -6 > "$WORK/iso/boot/initramfs.img"
-)
-
 cp "$KERNEL" "$WORK/iso/boot/vmlinuz"
 cp "$WORK/BOOTX64.EFI" "$WORK/iso/boot/BOOTX64.EFI"
 cp "$WORK/esp/efi.img" "$WORK/iso/boot/efi.img"
+
+rm -f "$WORK/live/boot/vmlinuz" "$WORK/live/boot/BOOTX64.EFI" "$WORK/live/boot/efi.img"
+mkdir -p "$WORK/iso/live"
+cp -a "$WORK/live/." "$WORK/iso/live/"
 
 cat > "$WORK/iso/boot/grub/grub.cfg" <<'EOF'
 set timeout=4

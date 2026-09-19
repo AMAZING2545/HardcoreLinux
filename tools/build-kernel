@@ -164,6 +164,11 @@ build_source() {
     set_config CONFIG_DEVTMPFS_MOUNT y
     set_config CONFIG_EXT4_FS y
     set_config CONFIG_ISO9660_FS y
+    set_config CONFIG_OVERLAY_FS y
+    set_config CONFIG_TMPFS y
+    set_config CONFIG_BLK_DEV_SR y
+    set_config CONFIG_SCSI y
+    set_config CONFIG_SCSI_CDROM y
     set_config CONFIG_VFAT_FS y
     set_config CONFIG_MSDOS_FS y
     set_config CONFIG_USB_STORAGE y

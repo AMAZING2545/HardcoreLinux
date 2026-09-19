@@ -51,8 +51,8 @@ printf '%s\n' 'Detected disks:'
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
 printf '\n'
 
-EFI_IMAGE=/boot/efi.img
-BOOTLOADER=/boot/BOOTX64.EFI
+EFI_IMAGE=/run/iso/boot/efi.img
+BOOTLOADER=/run/iso/boot/BOOTX64.EFI
 [ -f "$EFI_IMAGE" ] || die "embedded EFI system partition image not found: $EFI_IMAGE"
 [ -f "$BOOTLOADER" ] || die "embedded UEFI bootloader not found: $BOOTLOADER"
 
@@ -115,9 +115,15 @@ case "$MODE" in
     *) die "unknown installation mode" ;;
 esac
 
-ROOTFS=$(ask 'Path to rootfs.tar' '/rootfs.tar')
-[ -f "$ROOTFS" ] || die "rootfs archive not found: $ROOTFS"
-KERNEL=$(ask 'Path to kernel image' '/boot/vmlinuz')
+ROOTFS=$(ask 'Path to live root tree or rootfs.tar' '/run/iso/live')
+if [ -d "$ROOTFS" ]; then
+    :
+elif [ -f "$ROOTFS" ]; then
+    :
+else
+    die "root filesystem source not found: $ROOTFS"
+fi
+KERNEL=$(ask 'Path to kernel image' '/run/iso/boot/vmlinuz')
 [ -f "$KERNEL" ] || die "kernel image not found: $KERNEL"
 
 HOSTNAME=$(ask 'Hostname' 'obsidian')
@@ -137,7 +143,11 @@ mkdir -p "$TARGET/boot/efi"
 mount "$ESP" "$TARGET/boot/efi"
 
 printf '%s\n' 'Installing root filesystem...'
-tar -xpf "$ROOTFS" -C "$TARGET"
+if [ -d "$ROOTFS" ]; then
+    cp -a "$ROOTFS/." "$TARGET/"
+else
+    tar -xpf "$ROOTFS" -C "$TARGET"
+fi
 rm -f "$TARGET/etc/hc-live"
 
 mkdir -p "$TARGET/boot" "$TARGET/etc/yspm" "$TARGET/etc/profile.d" "$TARGET/home"

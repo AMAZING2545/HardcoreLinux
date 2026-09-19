@@ -95,6 +95,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            busybox-static \\
             bc \
             bison \
             build-essential \
@@ -129,6 +130,8 @@ jobs:
           file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
           test -s /tmp/vmlinuz
           test -d /tmp/kernel-modules/lib/modules
+          test -d /tmp/kernel-firmware/lib/firmware
+          find /tmp/kernel-firmware/lib/firmware -type f -print -quit | grep -q .
 
       - name: Build root filesystem
         env:
@@ -153,9 +156,15 @@ jobs:
           set -eu
           ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
 
-          rm -rf iso-root efi-check
-          mkdir -p iso-root efi-check
+          rm -rf iso-root live-root efi-check
+          mkdir -p iso-root live-root efi-check
           xorriso -osirrox on -indev "$ISO" -extract /boot iso-root/boot
+          xorriso -osirrox on -indev "$ISO" -extract /live live-root/live
+
+          test -s live-root/live/bin/sh
+          test -s live-root/live/etc/init
+          test -s live-root/live/etc/hc-live
+          test -s live-root/live/usr/sbin/hc-installer
 
           for path in \
             iso-root/boot/vmlinuz \
@@ -191,7 +200,13 @@ jobs:
             exit 1
           }
 
-          for member in init bin/sh etc/init etc/hc-live usr/sbin/hc-installer boot/BOOTX64.EFI boot/efi.img; do
+          INITRAMFS_SIZE="$(stat -c %s iso-root/boot/initramfs.img)"
+          test "$INITRAMFS_SIZE" -lt $((128 * 1024 * 1024)) || {
+            echo "initramfs is unexpectedly large: $INITRAMFS_SIZE bytes"
+            exit 1
+          }
+
+          for member in init bin/busybox bin/sh; do
             grep -Eq "(^|/)${member}$" initramfs.list || {
               echo "missing initramfs member: ${member}"
               tail -n 80 initramfs.list || true
