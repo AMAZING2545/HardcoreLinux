@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Shell syntax
+        run: |
+          set -eu
+          for file in \
+            tools/hc-installer \
+            tools/hc-setup-desktop \
+            tools/hc-release-checksums \
+            tools/bench-system \
+            tools/build-yspm \
+            tools/extract-kernel \
+            tools/build-image \
+            build/rootfs.build \
+            build/rootfs_build/init \
+            build/rootfs_build/initctl \
+            build/rootfs_build/scripts/00000-eth0-dhcp \
+            build/rootfs_build/services/iwd \
+            build/rootfs_build/services/dbus \
+            build.native/labwc.build \
+            build.native/ly.build \
+            build.native/iwd.build \
+            build.native/pipewire.build \
+            build.native/wireplumber.build \
+            build.native/waybar.build \
+            build.native/wofi.build \
+            build.native/ell.build; do
+              sh -n "$file"
+          done
+
+      - name: Shellcheck errors
+        run: |
+          shellcheck -S error \
+            tools/hc-installer \
+            tools/hc-setup-desktop \
+            tools/hc-release-checksums \
+            tools/bench-system \
+            tools/build-yspm \
+            tools/extract-kernel \
+            tools/build-image \
+            build/rootfs.build \
+            build/rootfs_build/init \
+            build/rootfs_build/initctl \
+            build/rootfs_build/scripts/00000-eth0-dhcp
+
+      - name: Python syntax
+        run: python3 -m py_compile tools/migrate-legacy-repo.py
