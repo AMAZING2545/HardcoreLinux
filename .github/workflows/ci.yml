@@ -167,11 +167,9 @@ jobs:
           test -s iso-root/boot/initramfs.img
           test -s iso-root/boot/grub/grub.cfg
 
-          mkdir -p iso-root/check/etc iso-root/check/usr/sbin
-          xorriso -osirrox on -indev "$ISO" -extract /etc/hc-live iso-root/check/etc/hc-live
-          xorriso -osirrox on -indev "$ISO" -extract /usr/sbin/hc-installer iso-root/check/usr/sbin/hc-installer
-          test -f iso-root/check/etc/hc-live
-          test -s iso-root/check/usr/sbin/hc-installer
+          INITRAMFS_CONTENT="$(gzip -dc iso-root/boot/initramfs.img | cpio -t 2>/dev/null)"
+          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -qx './etc/hc-live'
+          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -qx './usr/sbin/hc-installer'
 
           xorriso -indev "$ISO" -report_el_torito plain
 
