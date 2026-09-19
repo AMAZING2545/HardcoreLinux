@@ -102,6 +102,8 @@ fi
 mkdir -p "$ROOTFS/home" "$ROOTFS/root" "$ROOTFS/tmp"
 mkdir -p "$ROOTFS/etc/xdg/autostart"
 cp "$REPO_DIR/build/rootfs_build/xdg/autostart/obsidian-first-login.desktop" "$ROOTFS/etc/xdg/autostart/obsidian-first-login.desktop"
+cp "$REPO_DIR/build/rootfs_build/etc/chrony.conf" "$ROOTFS/etc/chrony.conf"
+cp "$REPO_DIR/build/rootfs_build/etc/nftables.conf" "$ROOTFS/etc/nftables.conf"
 printf '%s\n' 'root:x:0:0:root:/root:/bin/sh' > "$ROOTFS/etc/passwd"
 printf '%s\n' 'root:x:0:' > "$ROOTFS/etc/group"
 printf '%s\n' 'root:!:1:0:99999:7:::' > "$ROOTFS/etc/shadow"
