@@ -29,6 +29,7 @@ jobs:
             tools/hc-release-checksums \
             tools/bench-system \
             tools/build-yspm \
+            tools/build-kernel \
             tools/extract-kernel \
             tools/build-image \
             tools/build-iso \
@@ -40,6 +41,7 @@ jobs:
             tools/migrate-independent.sh \
             tools/build-native-meson \
             tools/build-native-configure \
+            tools/build-kernel \
             build/rootfs.build \
             build/rootfs_build/init \
             build/rootfs_build/initctl \
@@ -92,19 +94,27 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
+            bc \
+            bison \
+            build-essential \
             cpio \
             dosfstools \
             expect \
             file \
+            flex \
             gzip \
             grub-common \
             grub-efi-amd64-bin \
             grub-pc-bin \
             grub2-common \
+            libelf-dev \
+            libssl-dev \
             mtools \
             ovmf \
             qemu-system-x86 \
-            xorriso
+            xorriso \
+            xz-utils \
+            curl
 
       - name: Build yspm
         env:
@@ -119,14 +129,16 @@ jobs:
           YSPM_ARCHIVE_DIR: ${{ github.workspace }}/repo
           ROOTFS: /tmp/rootfs
           OUTPUT: /tmp/rootfs.tar
+          KERNEL_MODULES_DIR: /tmp/kernel-modules
           DISTRO_VERSION: ci-${{ github.run_number }}
         run: sudo -E sh build/rootfs.build
 
-      - name: Extract and verify kernel
+      - name: Build and verify kernel
         run: |
-          sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
+          sudo sh tools/build-kernel /tmp/vmlinuz /tmp/kernel-modules
           file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
           test -s /tmp/vmlinuz
+          test -d /tmp/kernel-modules/lib/modules
 
       - name: Build live ISO
         run: |
