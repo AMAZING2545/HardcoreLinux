@@ -68,7 +68,7 @@ if [ "$USE_AUDIO" = 1 ]; then
 fi
 [ "$USE_IWD" = 1 ] && install_package iwd
 
-mkdir -p /etc/profile.d /etc/sway /etc/labwc /etc/iwd /system/services /system/tmp
+mkdir -p /etc/profile.d /etc/default /system/services /system/tmp /etc/xdg
 : > /system/tmp/services
 
 cat > /etc/profile.d/20-desktop.sh <<'EOF'
@@ -113,14 +113,18 @@ cat > /etc/labwc/rc.xml <<'EOF'
 EOF
 
 cat > /etc/default/hardcore-desktop <<EOF
-WM=$WM
-LY=$USE_LY
+DESKTOP=$DESKTOP
+GDM=$USE_GDM
 PIPEWIRE=$USE_AUDIO
-IWD=$USE_IWD
+NETWORKMANAGER=$USE_NETWORK
+BLUETOOTH=$USE_BLUETOOTH
 EOF
 
-if [ "$USE_IWD" = 1 ] && command -v initctl >/dev/null 2>&1; then
-    initctl enable iwd || true
+if command -v initctl >/dev/null 2>&1; then
+    initctl enable elogind || true
+    initctl enable polkit || true
+    [ "$USE_NETWORK" = 1 ] && initctl enable NetworkManager || true
+    [ "$USE_BLUETOOTH" = 1 ] && initctl enable bluetooth || true
 fi
 
 printf '\n%s\n' 'Desktop setup finished.'
