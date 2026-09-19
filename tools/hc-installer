@@ -49,6 +49,18 @@ case "$MODE" in
         need mkfs.vfat
         DISK=$(ask 'Target disk, e.g. /dev/sda')
         [ -b "$DISK" ] || die "not a block device: $DISK"
+
+        DISK_TYPE=$(lsblk -dn -o TYPE "$DISK" 2>/dev/null || true)
+        [ "$DISK_TYPE" = "disk" ] || die "target must be a whole disk, not a partition: $DISK"
+
+        DISK_RO=$(lsblk -dn -o RO "$DISK" 2>/dev/null || true)
+        [ "$DISK_RO" = "0" ] || die "target disk is read-only: $DISK"
+
+        DISK_MOUNTS=$(lsblk -nr -o MOUNTPOINT "$DISK" 2>/dev/null | sed '/^$/d' || true)
+        [ -z "$DISK_MOUNTS" ] || die "target disk has mounted filesystems; unmount them first"
+
+        printf '%s\n' 'Selected target:'
+        lsblk -dn -o NAME,SIZE,MODEL,TRAN,RO "$DISK"
         yesno "ERASE AND REPARTITION $DISK?" "n" || die "installation cancelled"
         printf '%s\n' 'Writing a GPT layout: 512 MiB EFI + remaining space for Linux...'
         printf 'o\ny\nn\n1\n\n+512M\nEF00\nn\n2\n\n\n8300\nw\ny\n' | gdisk "$DISK"
