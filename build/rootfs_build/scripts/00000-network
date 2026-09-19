@@ -1,0 +1,14 @@
+#!/bin/sh
+
+for path in /sys/class/net/*; do
+    iface="${path##*/}"
+    [ "$iface" = lo ] && continue
+
+    ifconfig "$iface" up 2>/dev/null || true
+
+    case "$iface" in
+        eth*|en*|enx*)
+            udhcpc -i "$iface" -B >/dev/null 2>&1 &
+            ;;
+    esac
+done
