@@ -7,10 +7,10 @@ ask() {
     prompt="$1"
     default="${2:-}"
     printf '%s' "$prompt"
-    if [ -n "$default" ]; then printf ' [%s]' "$default"; fi
+    [ -n "$default" ] && printf ' [%s]' "$default"
     printf ': '
     IFS= read -r answer || true
-    if [ -z "$answer" ]; then answer="$default"; fi
+    [ -n "$answer" ] || answer="$default"
     printf '%s' "$answer"
 }
 yesno() {
@@ -52,7 +52,6 @@ case "$MODE" in
         yesno "ERASE AND REPARTITION $DISK?" "n" || die "installation cancelled"
         printf '%s\n' 'Writing a GPT layout: 512 MiB EFI + remaining space for Linux...'
         printf 'label: gpt\nsize=512M, type=U\nsize=0, type=L\n' | sfdisk "$DISK"
-        part_base=$(printf '%s' "$DISK" | sed 's/[0-9]*$//')
         case "$DISK" in
             *nvme*|*mmcblk*) ESP="${DISK}p1"; ROOT="${DISK}p2" ;;
             *) ESP="${DISK}1"; ROOT="${DISK}2" ;;
@@ -66,7 +65,9 @@ case "$MODE" in
         ROOT=$(ask 'Linux root partition')
         [ -b "$ESP" ] || die "not a block device: $ESP"
         [ -b "$ROOT" ] || die "not a block device: $ROOT"
-        if yesno "Format the root partition as ext4?" "n"; then mkfs.ext4 -F "$ROOT"; fi
+        if yesno "Format the root partition as ext4?" "n"; then
+            mkfs.ext4 -F "$ROOT"
+        fi
         ;;
     *) die "unknown installation mode" ;;
 esac
@@ -78,7 +79,7 @@ KERNEL=$(ask 'Path to kernel image' '/boot/vmlinuz')
 
 HOSTNAME=$(ask 'Hostname' 'hardcore')
 USERNAME=$(ask 'Username' 'user')
-YSPM_REPO=$(ask 'yspm repository URL' 'https://example.org/hardcorelinux/stable/index.json')
+YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json')
 BOOTLOADER=$(ask 'Bootloader (grub/systemd-boot)' 'grub')
 
 case "$USERNAME" in
@@ -95,6 +96,7 @@ mount "$ESP" "$TARGET/boot/efi"
 
 printf '%s\n' 'Installing root filesystem...'
 tar -xpf "$ROOTFS" -C "$TARGET"
+rm -f "$TARGET/etc/hc-live"
 
 mkdir -p "$TARGET/boot"
 cp "$KERNEL" "$TARGET/boot/vmlinuz"
@@ -104,6 +106,8 @@ printf '%s\n' "$HOSTNAME" > "$TARGET/etc/hostname"
 cat > "$TARGET/etc/yspm/env" <<EOF
 export YSPM_REPOSITORY='$YSPM_REPO'
 export YSPM_ROOT='/'
+export YSPM_DATA_DIR='/var/lib/yspm'
+export YSPM_CACHE_DIR='/var/cache/yspm'
 EOF
 
 cat > "$TARGET/etc/profile.d/yspm.sh" <<'EOF'
@@ -111,12 +115,11 @@ cat > "$TARGET/etc/profile.d/yspm.sh" <<'EOF'
 EOF
 chmod 0644 "$TARGET/etc/profile.d/yspm.sh"
 
-# Create the account through the target system's own BusyBox tools.
 chroot "$TARGET" /bin/sh -c "adduser -D -h /home/$USERNAME -s /bin/sh '$USERNAME' 2>/dev/null || adduser -h /home/$USERNAME -s /bin/sh '$USERNAME'"
 chroot "$TARGET" /bin/sh -c "addgroup '$USERNAME' audio 2>/dev/null || true"
-printf '%s' 'Set user password:'
+printf '%s\n' 'Set user password:'
 chroot "$TARGET" passwd "$USERNAME"
-printf '%s' 'Set root password:'
+printf '%s\n' 'Set root password:'
 chroot "$TARGET" passwd root
 chroot "$TARGET" /bin/sh -c "mkdir -p /home/$USERNAME/.config; chown -R $USERNAME:$USERNAME /home/$USERNAME"
 
@@ -126,8 +129,7 @@ ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
 case "$BOOTLOADER" in
     grub)
         need grub-install
-        chroot "$TARGET" /bin/sh -c "command -v grub-install >/dev/null 2>&1 || exit 42" || die "GRUB tools are not installed in the live environment"
-        grub-install --target=x86_64-efi --efi-directory="$TARGET/boot/efi" --bootloader-id=HardcoreLinux --boot-directory="$TARGET/boot" --recheck
+        grub-install --target=x86_64-efi --efi-directory="$TARGET/boot/efi" --bootloader-id=HardcoreLinux --boot-directory="$TARGET/boot" --removable --recheck --no-nvram
         mkdir -p "$TARGET/boot/grub"
         cat > "$TARGET/boot/grub/grub.cfg" <<EOF
 search --no-floppy --fs-uuid --set=root $ROOT_UUID
@@ -161,4 +163,4 @@ printf '%s\n' "Root: $ROOT"
 printf '%s\n' "User: $USERNAME"
 printf '%s\n' "Hostname: $HOSTNAME"
 printf '%s\n' "Bootloader: $BOOTLOADER"
-printf '%s\n' 'Reboot after unmounting the target filesystem.'
+printf '%s\n' 'Reboot after the installer unmounts the target filesystem.'
