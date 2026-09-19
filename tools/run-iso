@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+ISO="${1:-ObsidianCoreLinux.iso}"
+RAM="${RAM:-2048}"
+CPUS="${CPUS:-2}"
+
+command -v qemu-system-x86_64 >/dev/null 2>&1 || {
+    echo "run-iso: qemu-system-x86_64 is required" >&2
+    exit 1
+}
+
+[ -f "$ISO" ] || {
+    echo "run-iso: ISO not found: $ISO" >&2
+    exit 1
+}
+
+OVMF_CODE=
+for candidate in \
+    /usr/share/OVMF/OVMF_CODE.fd \
+    /usr/share/edk2/x64/OVMF_CODE.fd \
+    /usr/share/edk2-ovmf/x64/OVMF_CODE.fd; do
+    if [ -f "$candidate" ]; then
+        OVMF_CODE="$candidate"
+        break
+    fi
+done
+
+[ -n "$OVMF_CODE" ] || {
+    echo "run-iso: OVMF firmware is required for UEFI boot" >&2
+    exit 1
+}
+
+exec qemu-system-x86_64 \
+    -machine q35 \
+    -enable-kvm \
+    -cpu host \
+    -smp "$CPUS" \
+    -m "$RAM" \
+    -drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE" \
+    -cdrom "$ISO" \
+    -boot d \
+    -serial mon:stdio
