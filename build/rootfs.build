@@ -45,6 +45,15 @@ mkdir -p "$ROOTFS/etc" "$ROOTFS/usr/bin" "$ROOTFS/usr/sbin" "$ROOTFS/sbin"
 mkdir -p "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"
 mkdir -p "$ROOTFS/system/tmp" "$ROOTFS/var/lib/yspm" "$ROOTFS/var/cache/yspm"
 mkdir -p "$ROOTFS/etc/yspm" "$ROOTFS/etc/profile.d" "$ROOTFS/run/user"
+
+if [ -n "$KERNEL_MODULES_DIR" ]; then
+    [ -d "$KERNEL_MODULES_DIR/lib/modules" ] || {
+        echo "rootfs.build: kernel modules not found: $KERNEL_MODULES_DIR/lib/modules" >&2
+        exit 1
+    }
+    mkdir -p "$ROOTFS/lib"
+    cp -a "$KERNEL_MODULES_DIR/lib/modules" "$ROOTFS/lib/"
+fi
 mkdir -p "$ROOTFS/usr/share/obsidian-core-linux/profiles"
 
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
