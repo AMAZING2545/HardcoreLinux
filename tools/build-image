@@ -53,6 +53,7 @@ mount "$ROOT" "$MNT"
 mkdir -p "$MNT/boot/efi"
 mount "$ESP" "$MNT/boot/efi"
 tar -xpf "$ROOTFS" -C "$MNT"
+cp "$ROOTFS" "$MNT/rootfs.tar"
 mkdir -p "$MNT/boot"
 cp "$KERNEL" "$MNT/boot/vmlinuz"
 
