@@ -144,8 +144,8 @@ ID=obsidiancore
 ID_LIKE=alpine
 PRETTY_NAME="Obsidian Core Linux $DISTRO_VERSION"
 ANSI_COLOR="36"
-HOME_URL="https://github.com/Yassine-Jemi01/ObsidianCoreLinux"
-BUG_REPORT_URL="https://github.com/Yassine-Jemi01/ObsidianCoreLinux/issues"
+HOME_URL="https://github.com/Yassine-Jemi01/HardcoreLinux"
+BUG_REPORT_URL="https://github.com/Yassine-Jemi01/HardcoreLinux/issues"
 EOF
 
 : > "$ROOTFS/etc/hc-live"
