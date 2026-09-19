@@ -56,6 +56,13 @@ jobs:
           YSPM_REF: 824b39de2758f5434889b7814888cad2f6a4f16a
         run: sh tools/build-yspm
 
+      - name: Build and verify kernel
+        run: |
+          sudo sh tools/build-kernel /tmp/vmlinuz /tmp/kernel-modules
+          file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
+          test -s /tmp/vmlinuz
+          test -d /tmp/kernel-modules/lib/modules
+
       - name: Build root filesystem
         env:
           YSPM_BIN: /tmp/yspm
@@ -66,13 +73,6 @@ jobs:
           KERNEL_MODULES_DIR: /tmp/kernel-modules
         run: |
           DISTRO_VERSION="${RELEASE_TAG#v}" sudo -E sh build/rootfs.build
-
-      - name: Build and verify kernel
-        run: |
-          sudo sh tools/build-kernel /tmp/vmlinuz /tmp/kernel-modules
-          file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
-          test -s /tmp/vmlinuz
-          test -d /tmp/kernel-modules/lib/modules
 
       - name: Build live ISO
         run: |
