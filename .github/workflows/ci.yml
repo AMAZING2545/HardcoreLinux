@@ -116,8 +116,10 @@ jobs:
 
       - name: Install ISO and VM tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get \
+            -o Dpkg::Lock::Timeout=120 \
+            install -y --no-install-recommends \
             cpio \
             gzip \
             grub-efi-amd64-bin \
