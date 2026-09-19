@@ -8,17 +8,19 @@ set -eu
 
 BUILD_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 REPO_DIR=$(CDPATH= cd -- "$BUILD_DIR/.." && pwd)
+ARCHIVE_DIR="${YSPM_ARCHIVE_DIR:-$REPO_DIR/repo}"
 ROOTFS="${ROOTFS:-$BUILD_DIR/rootfs}"
 OUTPUT="${OUTPUT:-$BUILD_DIR/rootfs.tar}"
 DISTRO_VERSION="${DISTRO_VERSION:-0.3.0}"
 
 extract_if_present() {
     archive="$1"
-    if [ -f "$REPO_DIR/$archive" ]; then
-        echo "extracting $archive"
-        tar -xpzf "$REPO_DIR/$archive" -C "$ROOTFS"
+    source="$ARCHIVE_DIR/$archive"
+    if [ -f "$source" ]; then
+        echo "extracting $source"
+        tar -xpzf "$source" -C "$ROOTFS"
     else
-        echo "skipping missing archive: $archive"
+        echo "skipping missing archive: $source"
     fi
 }
 
@@ -54,7 +56,13 @@ if [ -d "$BUILD_DIR/rootfs_build/drivers" ]; then
     cp -a "$BUILD_DIR/rootfs_build/drivers/." "$ROOTFS/system/drivers/"
 fi
 chmod 0755 "$ROOTFS/etc/init" "$ROOTFS/sbin/initctl"
-find "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers" -type f -exec chmod 0755 {} ; 2>/dev/null || true
+for tree in "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"; do
+    if [ -d "$tree" ]; then
+        find "$tree" -type f -print | while IFS= read -r file; do
+            chmod 0755 "$file"
+        done
+    fi
+done
 printf '%s\n' 'dbus' > "$ROOTFS/system/enabled-services"
 : > "$ROOTFS/system/tmp/services"
 
