@@ -66,7 +66,8 @@ for tree in "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/d
         done
     fi
 done
-printf '%s\n' 'dbus
+printf '%s\n' 'udev
+dbus
 elogind
 polkit
 NetworkManager' > "$ROOTFS/system/enabled-services"
