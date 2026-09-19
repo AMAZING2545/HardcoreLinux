@@ -4,7 +4,6 @@ set -eu
 KERNEL_VERSION="${KERNEL_VERSION:-7.2.6}"
 KERNEL_URL="${KERNEL_URL:-https://www.kernel.org/pub/linux/kernel/v7.x/linux-${KERNEL_VERSION}.tar.xz}"
 KERNEL_SHA256="${KERNEL_SHA256:-039aef84f2b0994aeda3f4fcfc3d02ec9d7a9bbb9020ea264c43f446c860f606}"
-CONFIG_FILE="${KERNEL_CONFIG:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)/configs/linux.config.7.2}"
 OUTPUT="${1:-/tmp/vmlinuz}"
 MODULES_OUTPUT="${2:-/tmp/kernel-modules}"
 WORKDIR="${KERNEL_WORKDIR:-/tmp/obsidian-kernel}"
@@ -21,8 +20,6 @@ need() {
 for cmd in curl sha256sum tar make sed grep install getconf; do
     need "$cmd"
 done
-
-[ -f "$CONFIG_FILE" ] || die "kernel config not found: $CONFIG_FILE"
 
 mkdir -p "$WORKDIR"
 ARCHIVE="$WORKDIR/linux-$KERNEL_VERSION.tar.xz"
@@ -43,8 +40,6 @@ fi
 
 rm -rf "$MODULES_OUTPUT"
 mkdir -p "$MODULES_OUTPUT"
-
-cp "$CONFIG_FILE" "$SOURCE/.config"
 
 set_config() {
     key="$1"
@@ -77,20 +72,30 @@ set_string_config() {
     fi
 }
 
-# The live ISO uses an external gzip-compressed initramfs.
+# Start from the upstream x86_64 defconfig instead of carrying a huge
+# machine-generated configuration. Distribution-specific hardware requirements
+# are then enabled explicitly below for a small, reproducible kernel.
+(
+    cd "$SOURCE"
+    make defconfig
+)
+
+# The live ISO carries a raw cpio initramfs.
 set_config CONFIG_BLK_DEV_INITRD y
-set_config CONFIG_RD_GZIP y
-set_config CONFIG_RD_BZIP2 y
-set_config CONFIG_RD_LZMA y
-set_config CONFIG_RD_XZ y
-set_config CONFIG_RD_LZO y
-set_config CONFIG_RD_LZ4 y
-set_config CONFIG_RD_ZSTD y
 
 # Never bake a machine-specific root device into the distribution kernel.
 set_config CONFIG_CMDLINE_BOOL y
 set_string_config CONFIG_CMDLINE ""
 unset_config CONFIG_CMDLINE_OVERRIDE
+
+# Core laptop/desktop hardening and hardware support.
+set_config CONFIG_CPU_MITIGATIONS y
+set_config CONFIG_ACPI y
+set_config CONFIG_ACPI_BATTERY y
+set_config CONFIG_ACPI_BUTTON y
+set_config CONFIG_ACPI_THERMAL y
+set_config CONFIG_CPU_FREQ y
+set_config CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL y
 
 # Required for the QEMU installer/installed-system test and common VM storage.
 set_config CONFIG_VIRTIO y
