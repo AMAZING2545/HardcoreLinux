@@ -9,73 +9,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Install validation tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck file
-
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Shell syntax
         run: |
           set -eu
-          for file in \
-            tools/hc-installer \
-            tools/hc-setup-desktop \
-            tools/hc-release-checksums \
-            tools/bench-system \
-            tools/build-yspm \
-            tools/extract-kernel \
-            tools/build-image \
-            tools/run-qemu \
-            tools/run-iso \
-            tools/hc-doctor \
-            tools/hc-recovery \
-            tools/obsidian-first-login \
-            tools/migrate-independent.sh \
-            tools/build-native-meson \
-            tools/build-native-configure \
-            build/rootfs.build \
-            build/rootfs_build/init \
-            build/rootfs_build/initctl \
-            build/rootfs_build/scripts/00000-eth0-dhcp \
-            build/rootfs_build/services/iwd \
-            build/rootfs_build/services/dbus \
-            build/rootfs_build/services/elogind \
-            build/rootfs_build/services/NetworkManager \
-            build/rootfs_build/services/polkit \
-            build/rootfs_build/services/bluetooth \
-            build/rootfs_build/services/upower \
-            build/rootfs_build/services/power-profiles-daemon \
-            build/rootfs_build/services/fwupd \
-            build/rootfs_build/services/udev \
-            build/rootfs_build/services/chronyd \
-            build/rootfs_build/services/nftables; do
+          for file in             tools/hc-installer             tools/hc-setup-desktop             tools/hc-release-checksums             tools/bench-system             tools/build-yspm             tools/extract-kernel             tools/build-image             tools/run-qemu             tools/run-iso             tools/hc-doctor             tools/hc-recovery             tools/obsidian-first-login             tools/migrate-independent.sh             tools/build-native-meson             tools/build-native-configure             build/rootfs.build             build/rootfs_build/init             build/rootfs_build/initctl             build/rootfs_build/scripts/00000-eth0-dhcp             build/rootfs_build/services/iwd             build/rootfs_build/services/dbus             build/rootfs_build/services/elogind             build/rootfs_build/services/NetworkManager             build/rootfs_build/services/polkit             build/rootfs_build/services/bluetooth             build/rootfs_build/services/upower             build/rootfs_build/services/power-profiles-daemon             build/rootfs_build/services/fwupd             build/rootfs_build/services/udev             build/rootfs_build/services/chronyd             build/rootfs_build/services/nftables; do
               sh -n "$file"
           done
-
-      - name: Shellcheck errors
+      - name: Shellcheck
         run: |
-          shellcheck -S error \
-            tools/hc-installer \
-            tools/hc-setup-desktop \
-            tools/hc-release-checksums \
-            tools/bench-system \
-            tools/build-yspm \
-            tools/extract-kernel \
-            tools/build-image \
-            tools/run-qemu \
-            tools/run-iso \
-            tools/hc-doctor \
-            tools/hc-recovery \
-            tools/obsidian-first-login \
-            tools/migrate-independent.sh \
-            tools/build-native-meson \
-            tools/build-native-configure \
-            build/rootfs.build \
-            build/rootfs_build/init \
-            build/rootfs_build/initctl \
-            build/rootfs_build/scripts/00000-eth0-dhcp
-
+          shellcheck -S error             tools/hc-installer tools/hc-setup-desktop tools/hc-release-checksums             tools/bench-system tools/build-yspm tools/extract-kernel tools/build-image             tools/run-qemu tools/run-iso tools/hc-doctor tools/hc-recovery             tools/obsidian-first-login tools/migrate-independent.sh             tools/build-native-meson tools/build-native-configure build/rootfs.build             build/rootfs_build/init build/rootfs_build/initctl             build/rootfs_build/scripts/00000-eth0-dhcp
       - name: Python syntax
         run: python3 -m py_compile tools/migrate-legacy-repo.py
 
@@ -86,35 +30,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-
-      - name: Install ISO and VM tooling
+      - name: Install ISO tools
         run: |
           sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 update
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get \
-            -o Dpkg::Lock::Timeout=120 \
-            install -y --no-install-recommends \
-            cpio \
-            file \
-            gzip \
-            grub-efi-amd64-bin \
-            grub-pc-bin \
-            grub2-common \
-            mtools \
-            ovmf \
-            qemu-system-x86 \
-            xorriso
-
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get             -o Dpkg::Lock::Timeout=120             install -y --no-install-recommends             cpio file gzip grub-efi-amd64-bin grub-pc-bin grub2-common mtools ovmf qemu-system-x86 xorriso
       - name: Build yspm
         env:
           YSPM_OUTPUT: /tmp/yspm
           YSPM_REF: 824b39de2758f5434889b7814888cad2f6a4f16a
         run: sh tools/build-yspm
-
       - name: Build root filesystem
         env:
           YSPM_BIN: /tmp/yspm
@@ -124,195 +52,43 @@ jobs:
           OUTPUT: /tmp/rootfs.tar
           DISTRO_VERSION: ci-${{ github.run_number }}
         run: sudo -E sh build/rootfs.build
-
       - name: Extract and verify kernel
         run: |
           sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
-          KERNEL_TYPE="$(file -b /tmp/vmlinuz)"
-          printf 'kernel type: %s\n' "$KERNEL_TYPE"
-
+          file -b /tmp/vmlinuz | grep -qi 'Linux kernel'
       - name: Build live ISO
         run: |
-          sudo sh tools/build-iso \
-            /tmp/rootfs.tar \
-            /tmp/vmlinuz \
-            "${{ github.workspace }}/ObsidianCoreLinux-${{ github.sha }}.iso"
-
-      - name: Verify ISO structure
+          sudo sh tools/build-iso             /tmp/rootfs.tar             /tmp/vmlinuz             "${{ github.workspace }}/ObsidianCoreLinux-${{ github.sha }}.iso"
+      - name: Verify ISO contents
         run: |
           set -eu
           ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
           test -s "$ISO"
-
           rm -rf iso-root
           mkdir -p iso-root
           xorriso -osirrox on -indev "$ISO" -extract /boot iso-root/boot
           test -s iso-root/boot/vmlinuz
           test -s iso-root/boot/initramfs.img
           test -s iso-root/boot/grub/grub.cfg
-
           gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null
-          grep -Eq '(^|/)etc/hc-live          xorriso -indev "$ISO" -report_el_torito plain
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set -u
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          set +e
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          test "$RC" -eq 124 || {
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          }
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 90
- initramfs.list
-          grep -Eq '(^|/)usr/sbin/hc-installer          xorriso -indev "$ISO" -report_el_torito plain
-          sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
-        run: |
-          set -u
-          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
-          set +e
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
-          set -e
-
-          cat qemu.log
-
-          test "$RC" -eq 124 || {
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          }
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-iso-${{ github.sha }}
-          path: |
-            ObsidianCoreLinux-${{ github.sha }}.iso
-            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
-          if-no-files-found: error
-          retention-days: 90
-
-      - name: Upload QEMU log
-        uses: actions/upload-artifact@v4
-        with:
-          name: obsidian-core-linux-qemu-log-${{ github.sha }}
-          path: qemu.log
-          if-no-files-found: error
-          retention-days: 90
- initramfs.list
-
+          grep -Eq '(^|/)etc/hc-live$' initramfs.list
+          grep -Eq '(^|/)usr/sbin/hc-installer$' initramfs.list
           xorriso -indev "$ISO" -report_el_torito plain
           sha256sum "$ISO" | tee "$ISO.sha256"
-
-      - name: Boot ISO in QEMU
+      - name: Boot ISO in UEFI QEMU
         run: |
-          set -u
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
           OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
-          test -n "$OVMF_CODE" || {
-            echo "OVMF firmware not found"
-            exit 1
-          }
-
+          test -n "$OVMF_CODE"
           set +e
-          timeout --kill-after=5s 35s qemu-system-x86_64 \
-            -machine q35 \
-            -m 1024 \
-            -smp 2 \
-            -cpu max \
-            -bios "$OVMF_CODE" \
-            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
-            -boot d \
-            -no-reboot \
-            -no-shutdown \
-            -display none \
-            -serial stdio \
-            > qemu.log 2>&1
-          RC=$?
+          timeout --kill-after=5s 35s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -no-shutdown             -display none             -serial stdio             > qemu.log 2>&1
+          rc=$?
           set -e
-
           cat qemu.log
-
-          test "$RC" -eq 124 || {
-            echo "QEMU exited unexpectedly with status $RC"
-            exit 1
-          }
-
-          grep -q "Obsidian Core Linux installer" qemu.log || {
-            echo "Live installer did not appear on the serial console"
-            exit 1
-          }
-
-      - name: Upload ISO artifact
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux installer' qemu.log
+      - name: Upload verified ISO
         uses: actions/upload-artifact@v4
         with:
           name: obsidian-core-linux-iso-${{ github.sha }}
@@ -321,8 +97,7 @@ jobs:
             ObsidianCoreLinux-${{ github.sha }}.iso.sha256
           if-no-files-found: error
           retention-days: 90
-
-      - name: Upload QEMU log
+      - name: Upload boot log
         uses: actions/upload-artifact@v4
         with:
           name: obsidian-core-linux-qemu-log-${{ github.sha }}
