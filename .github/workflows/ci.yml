@@ -185,7 +185,7 @@ jobs:
             exit 1
           }
 
-          timeout 25s qemu-system-x86_64 \
+          timeout --kill-after=5s 35s qemu-system-x86_64 \
             -machine q35 \
             -m 1024 \
             -smp 2 \
@@ -193,6 +193,8 @@ jobs:
             -bios "$OVMF_CODE" \
             -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
             -boot d \
+            -no-reboot \
+            -no-shutdown \
             -display none \
             -serial stdio \
             > qemu.log 2>&1
@@ -215,9 +217,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: obsidian-core-linux-iso-${{ github.sha }}
-          path: ObsidianCoreLinux-${{ github.sha }}.iso
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
       - name: Upload QEMU log
         uses: actions/upload-artifact@v4
