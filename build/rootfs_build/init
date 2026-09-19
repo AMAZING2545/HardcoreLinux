@@ -5,8 +5,9 @@ echo "Hardcore Linux init"
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
-mkdir -p /dev/pts /dev/mqueue /run /tmp /system/tmp
+mkdir -p /dev/pts /dev/mqueue /run /tmp /system/tmp /run/user
 mount -t devpts devpts /dev/pts 2>/dev/null || true
+mount -t devmq devmq /dev/mqueue 2>/dev/null || true
 mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
 chmod 1777 /tmp 2>/dev/null || true
@@ -34,17 +35,13 @@ if [ -f /system/drivers/modprobe ] && command -v modprobe >/dev/null 2>&1; then
     done < /system/drivers/modprobe
 fi
 
-if [ -f /system/tmp/services ]; then
-    :
-else
-    : > /system/tmp/services
-fi
+: > /system/tmp/services
 
 echo "executing boot scripts"
 if [ -d /system/scripts ]; then
     for script in /system/scripts/*; do
         [ -f "$script" ] || continue
-        chmod 755 "$script" 2>/dev/null || true
+        chmod 0755 "$script" 2>/dev/null || true
         echo "[  ok  ] script ${script##*/}"
         setsid "$script" >/dev/null 2>&1 &
         sleep 0.05
@@ -71,14 +68,22 @@ if [ -f /system/enabled-services ]; then
     done < /system/enabled-services
 fi
 
-# ly can replace the traditional getty loop when installed.
-if command -v ly >/dev/null 2>&1; then
+if [ -f /etc/hc-live ]; then
+    echo "[  ok  ] live environment"
+    echo "[  ok  ] starting installer on tty1"
+    setsid sh /usr/sbin/hc-installer </dev/tty1 >/dev/tty1 2>&1 &
+fi
+
+if command -v ly >/dev/null 2>&1 && [ ! -f /etc/hc-live ]; then
     echo "[  ok  ] starting ly"
     exec ly
 fi
 
 echo "starting tty login"
 for tty in tty1 tty2 tty3 tty4 tty5 tty6; do
+    if [ "$tty" = tty1 ] && [ -f /etc/hc-live ]; then
+        continue
+    fi
     (
         while :; do
             getty 0 "$tty"
