@@ -54,6 +54,14 @@ if [ -n "$KERNEL_MODULES_DIR" ]; then
     mkdir -p "$ROOTFS/lib"
     cp -a "$KERNEL_MODULES_DIR/lib/modules" "$ROOTFS/lib/"
 fi
+if [ -n "$KERNEL_FIRMWARE_DIR" ]; then
+    [ -d "$KERNEL_FIRMWARE_DIR/lib/firmware" ] || {
+        echo "rootfs.build: kernel firmware not found: $KERNEL_FIRMWARE_DIR/lib/firmware" >&2
+        exit 1
+    }
+    mkdir -p "$ROOTFS/lib/firmware"
+    cp -a "$KERNEL_FIRMWARE_DIR/lib/firmware/." "$ROOTFS/lib/firmware/"
+fi
 mkdir -p "$ROOTFS/usr/share/obsidian-core-linux/profiles"
 
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
