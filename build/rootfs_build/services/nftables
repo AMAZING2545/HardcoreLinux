@@ -1,0 +1,6 @@
+#!/bin/sh
+[ -x /usr/sbin/nft ] || [ -x /usr/bin/nft ] || {
+    echo "nftables: nft command not found" >&2
+    exit 1
+}
+exec nft -f /etc/nftables.conf
