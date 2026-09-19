@@ -1,21 +1,11 @@
-
-
 #!/bin/sh
+set -eu
 
-wd=$(pwd)
-cd $dir
-rm -rf /tmp/stage
-rm -rf build
-mkdir build && cd build
-meson setup .. --prefix=/usr -Dtests=false --reconfigure
-ninja
-meson install --destdir=/tmp/stage
-mkdir -p /tmp/stage/etc/installer/glib
-find /tmp/stage -name *.so -exec strip --strip-all {} \;
-echo 'glib 2.89.3 musl' > /tmp/stage/etc/installer/glib/pkinfo
-rm -rf /tmp/stage/usr/share/man
-rm -rf /tmp/stage/usr/share/info
-rm -rf /tmp/stage/usr/share/doc
-cd $wd
-./flashpack /tmp/stage
-mv /tmp/stage/*.tar .
+: "${dir:?set dir to the extracted glib source tree}"
+: "${YSPM_BIN:=yspm}"
+
+REPO_ROOT="${REPO_ROOT:-.}"
+VERSION="${VERSION:-2.89.3}"
+OUT="${OUTPUT:-glib-${VERSION}-${ARCH:-x86_64}.yspkg}"
+
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" glib "$VERSION" "GLib core utility library"
