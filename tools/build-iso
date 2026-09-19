@@ -83,7 +83,7 @@ menuentry 'Obsidian Core Linux (Recovery)' {
 }
 EOF
 
-grub-mkrescue -o "$OUTPUT" -volid OBSIDIANCORE "$WORK/iso"
+grub-mkrescue -o "$OUTPUT" -- -volid OBSIDIANCORE "$WORK/iso"
 
 [ -s "$OUTPUT" ] || {
     echo "build-iso: grub-mkrescue did not create a non-empty ISO" >&2
