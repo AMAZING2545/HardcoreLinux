@@ -1,8 +1,16 @@
 # Installing Hardcore Linux
 
-Hardcore Linux now includes a small interactive installer for UEFI x86_64 systems.
+Hardcore Linux includes a live ISO and a small interactive installer for UEFI x86_64 systems.
 
 The installer is intentionally simple and explicit. It shows the detected disks before any destructive operation and asks for every important system setting.
+
+## Booting the live ISO
+
+The release ISO is the normal starting point for a fresh installation. Boot it in UEFI mode.
+
+The live system starts the installer on tty1. You can also launch it manually with `sh /usr/sbin/hc-installer`.
+
+The current live ISO uses an initramfs-based live root, which keeps the first implementation simple. A compressed read-only live filesystem is planned for later releases.
 
 ## Before installing
 
@@ -98,4 +106,4 @@ Run:
 sudo sh /usr/sbin/hc-setup-desktop
 ~~~
 
-The desktop setup can install Sway or labwc and the optional display, audio, and wireless components.
+GNOME is the default desktop profile. The setup installs GNOME, GDM, PipeWire/WirePlumber, NetworkManager, Bluetooth integration, desktop portals, and the supporting services from the yspm repository.
