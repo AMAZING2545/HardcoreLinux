@@ -124,7 +124,30 @@ chroot "$TARGET" passwd root
 chroot "$TARGET" /bin/sh -c "mkdir -p /home/$USERNAME/.config; chown -R $USERNAME:$USERNAME /home/$USERNAME"
 
 ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
+ESP_UUID=$(blkid -s UUID -o value "$ESP")
 [ -n "$ROOT_UUID" ] || die "could not read root filesystem UUID"
+[ -n "$ESP_UUID" ] || die "could not read EFI filesystem UUID"
+
+cat > "$TARGET/etc/fstab" <<EOF
+UUID=$ROOT_UUID / ext4 defaults,noatime 0 1
+UUID=$ESP_UUID /boot/efi vfat umask=0077 0 2
+EOF
+
+mkdir -p "$TARGET/etc/sudoers.d"
+cat > "$TARGET/etc/sudoers.d/10-wheel" <<'EOF'
+%wheel ALL=(ALL:ALL) ALL
+EOF
+chmod 0440 "$TARGET/etc/sudoers.d/10-wheel"
+
+cat > "$TARGET/etc/motd" <<'EOF'
+Hardcore Linux
+GNOME desktop setup:
+  sudo /usr/sbin/hc-setup-desktop
+
+Package management:
+  sudo yspm update
+  sudo yspm install <package>
+EOF
 
 case "$BOOTLOADER" in
     grub)
