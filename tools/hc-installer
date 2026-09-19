@@ -41,19 +41,25 @@ need lsblk
 need blkid
 need chroot
 need mkfs.ext4
+need dd
 
 printf '\033c'
 printf '%s\n' 'Obsidian Core Linux installer'
-printf '%s\n\n' 'This installer is intentionally small. Review every value before writing a disk.'
+printf '%s\n\n' 'The installer uses the embedded UEFI bootloader shipped in this ISO.'
+printf '%s\n' 'Review every value carefully. Guided installation erases the selected disk.'
 printf '%s\n' 'Detected disks:'
 lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
 printf '\n'
+
+EFI_IMAGE=/boot/efi.img
+BOOTLOADER=/boot/BOOTX64.EFI
+[ -f "$EFI_IMAGE" ] || die "embedded EFI system partition image not found: $EFI_IMAGE"
+[ -f "$BOOTLOADER" ] || die "embedded UEFI bootloader not found: $BOOTLOADER"
 
 MODE=$(ask 'Installation mode (guided/manual)' 'guided')
 case "$MODE" in
     guided)
         need gdisk
-        need mkfs.vfat
         DISK=$(ask 'Target disk, e.g. /dev/sda')
         [ -b "$DISK" ] || die "not a block device: $DISK"
 
@@ -77,16 +83,33 @@ case "$MODE" in
             *) ESP="${DISK}1"; ROOT="${DISK}2" ;;
         esac
         sleep 1
-        mkfs.vfat -F 32 "$ESP"
-        mkfs.ext4 -F "$ROOT"
+        [ -b "$ESP" ] || die "EFI partition was not created: $ESP"
+        [ -b "$ROOT" ] || die "root partition was not created: $ROOT"
+
+        ESP_IMAGE_SIZE=$(wc -c < "$EFI_IMAGE")
+        ESP_SIZE=$(lsblk -bn -o SIZE "$ESP" 2>/dev/null | tr -d ' ' || true)
+        [ -n "$ESP_SIZE" ] || die "could not determine EFI partition size"
+        [ "$ESP_SIZE" -ge "$ESP_IMAGE_SIZE" ] || die "EFI partition is smaller than the embedded boot image"
+
+        printf '%s\n' 'Installing embedded EFI filesystem...'
+        dd if="$EFI_IMAGE" of="$ESP" bs=4M conv=fsync,status=none
+        mkfs.ext4 -F -L OBSIDIAN "$ROOT"
         ;;
     manual)
         ESP=$(ask 'EFI system partition')
         ROOT=$(ask 'Linux root partition')
         [ -b "$ESP" ] || die "not a block device: $ESP"
         [ -b "$ROOT" ] || die "not a block device: $ROOT"
+
+        ESP_TYPE=$(blkid -s TYPE -o value "$ESP" 2>/dev/null || true)
+        case "$ESP_TYPE" in
+            vfat|fat|fat32) ;;
+            *) die "EFI partition must already be FAT32 (detected: ${ESP_TYPE:-unknown})" ;;
+        esac
+
+        yesno "Install the Obsidian UEFI bootloader into $ESP?" "n" || die "installation cancelled"
         if yesno "Format the root partition as ext4?" "n"; then
-            mkfs.ext4 -F "$ROOT"
+            mkfs.ext4 -F -L OBSIDIAN "$ROOT"
         fi
         ;;
     *) die "unknown installation mode" ;;
@@ -97,16 +120,15 @@ ROOTFS=$(ask 'Path to rootfs.tar' '/rootfs.tar')
 KERNEL=$(ask 'Path to kernel image' '/boot/vmlinuz')
 [ -f "$KERNEL" ] || die "kernel image not found: $KERNEL"
 
-HOSTNAME=$(ask 'Hostname' 'hardcore')
+HOSTNAME=$(ask 'Hostname' 'obsidian')
 USERNAME=$(ask 'Username' 'user')
 YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json')
-BOOTLOADER=$(ask 'Bootloader (grub/systemd-boot)' 'grub')
 
 case "$USERNAME" in
     ''|*[!a-zA-Z0-9._-]*) die "invalid username: $USERNAME" ;;
 esac
 
-TARGET=/mnt/hardcore
+TARGET=/mnt/obsidian
 mkdir -p "$TARGET"
 mount "$ROOT" "$TARGET"
 trap 'umount "$TARGET/boot/efi" 2>/dev/null || true; umount "$TARGET" 2>/dev/null || true' EXIT INT TERM
@@ -118,9 +140,7 @@ printf '%s\n' 'Installing root filesystem...'
 tar -xpf "$ROOTFS" -C "$TARGET"
 rm -f "$TARGET/etc/hc-live"
 
-mkdir -p "$TARGET/boot"
-cp "$KERNEL" "$TARGET/boot/vmlinuz"
-mkdir -p "$TARGET/etc/yspm" "$TARGET/etc/profile.d" "$TARGET/home"
+mkdir -p "$TARGET/boot" "$TARGET/etc/yspm" "$TARGET/etc/profile.d" "$TARGET/home"
 printf '%s\n' "$HOSTNAME" > "$TARGET/etc/hostname"
 
 cat > "$TARGET/etc/yspm/env" <<EOF
@@ -153,6 +173,16 @@ UUID=$ROOT_UUID / ext4 defaults,noatime 0 1
 UUID=$ESP_UUID /boot/efi vfat umask=0077 0 2
 EOF
 
+mkdir -p "$TARGET/boot/grub" "$TARGET/boot/efi/EFI/BOOT"
+cp "$BOOTLOADER" "$TARGET/boot/efi/EFI/BOOT/BOOTX64.EFI"
+cp "$KERNEL" "$TARGET/boot/vmlinuz"
+
+cat > "$TARGET/boot/grub/grub.cfg" <<'EOF'
+search --no-floppy --label --set=root OBSIDIAN
+linux /boot/vmlinuz root=LABEL=OBSIDIAN rw init=/etc/init
+boot
+EOF
+
 mkdir -p "$TARGET/etc/sudoers.d"
 cat > "$TARGET/etc/sudoers.d/10-wheel" <<'EOF'
 %wheel ALL=(ALL:ALL) ALL
@@ -169,41 +199,10 @@ Package management:
   sudo yspm install <package>
 EOF
 
-case "$BOOTLOADER" in
-    grub)
-        need grub-install
-        grub-install --target=x86_64-efi --efi-directory="$TARGET/boot/efi" --bootloader-id=ObsidianCoreLinux --boot-directory="$TARGET/boot" --removable --recheck --no-nvram
-        mkdir -p "$TARGET/boot/grub"
-        cat > "$TARGET/boot/grub/grub.cfg" <<EOF
-search --no-floppy --fs-uuid --set=root $ROOT_UUID
-set timeout=3
-menuentry 'Obsidian Core Linux' {
-    linux /boot/vmlinuz root=UUID=$ROOT_UUID rw init=/etc/init
-}
-EOF
-        ;;
-    systemd-boot)
-        need bootctl
-        bootctl --path="$TARGET/boot/efi" install
-        mkdir -p "$TARGET/boot/efi/loader/entries"
-        cat > "$TARGET/boot/efi/loader/loader.conf" <<'EOF'
-default hardcore
-timeout 3
-editor no
-EOF
-        cat > "$TARGET/boot/efi/loader/entries/hardcore.conf" <<EOF
-title Obsidian Core Linux
-linux /boot/vmlinuz
-options root=UUID=$ROOT_UUID rw init=/etc/init
-EOF
-        ;;
-    *) die "unsupported bootloader: $BOOTLOADER" ;;
-esac
-
 sync
 printf '\n%s\n' 'Installation completed.'
 printf '%s\n' "Root: $ROOT"
 printf '%s\n' "User: $USERNAME"
 printf '%s\n' "Hostname: $HOSTNAME"
-printf '%s\n' "Bootloader: $BOOTLOADER"
+printf '%s\n' 'Boot: embedded Obsidian Core Linux UEFI loader'
 printf '%s\n' 'Reboot after the installer unmounts the target filesystem.'
