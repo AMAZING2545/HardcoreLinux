@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+OUT="${1:-SHA256SUMS}"
+ROOT="${2:-.}"
+
+command -v sha256sum >/dev/null 2>&1 || {
+    echo "hc-release-checksums: sha256sum is required" >&2
+    exit 1
+}
+
+find "$ROOT" -maxdepth 2 -type f \( -name '*.img' -o -name '*.iso' -o -name '*.tar' -o -name '*.tar.gz' \) -print0 |
+while IFS= read -r -d '' file; do
+    printf '%s  %s\n' "$(sha256sum "$file" | awk '{print $1}')" "$file"
+done | sort > "$OUT"
+
+echo "wrote $OUT"
