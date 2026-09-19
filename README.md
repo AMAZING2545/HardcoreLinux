@@ -19,13 +19,13 @@ The project uses:
 - Sway as the primary desktop path
 - labwc as an alternative desktop path
 
-## What changed
+## Current development foundation
 
-The current development line adds the pieces needed for a usable distribution rather than only a root filesystem:
+The current development line adds the pieces needed for a usable distribution:
 
 - interactive installer
-- guided or manual partitioning
-- GRUB and systemd-boot installation paths
+- guided GPT or manual partitioning
+- GRUB and systemd-boot installation paths when their tools are available
 - hostname and user configuration
 - automated desktop setup
 - Sway and labwc
@@ -40,7 +40,7 @@ The current development line adds the pieces needed for a usable distribution ra
 - release SHA-256 checksums
 - automated release image builds
 - reproducible benchmark methodology
-- installation and desktop documentation
+- installation, desktop, and troubleshooting documentation
 
 ## yspm
 
@@ -66,11 +66,11 @@ sudo yspm upgrade
 
 The distribution does not maintain a second package manager.
 
-The existing tar archive repository is still kept during the migration to native yspkg packages. The release workflow can convert the legacy packages, build a yspm index, and publish the native packages with the release.
+The existing tar archive repository is still kept during the migration to native yspkg packages. The release workflow converts legacy packages, builds a yspm index, and publishes native packages with each release.
 
 ## Build the root filesystem
 
-The existing build system keeps the bootstrap artifacts in the repository.
+The bootstrap archives currently live under repo/.
 
 Build the yspm binary:
 
@@ -81,7 +81,7 @@ sh tools/build-yspm
 Then build the root filesystem:
 
 ~~~bash
-sudo YSPM_BIN=/tmp/yspm sh build/rootfs.build
+sudo env YSPM_BIN=/tmp/yspm YSPM_ARCHIVE_DIR="$PWD/repo" sh build/rootfs.build
 ~~~
 
 Output:
@@ -90,14 +90,14 @@ Output:
 build/rootfs.tar
 ~~~
 
-The rootfs builder no longer depends on the old flashman package manager.
+The rootfs builder no longer installs the old flashman package manager.
 
 ## Build a bootable image
 
-Extract a kernel from the standalone kernel archive:
+Extract a kernel from the repository's standalone kernel archive:
 
 ~~~bash
-sudo sh tools/extract-kernel linux_UEFI_standalone.tar /tmp/vmlinuz
+sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
 ~~~
 
 Build a UEFI disk image:
@@ -110,7 +110,7 @@ sudo sh tools/build-image \
   2G
 ~~~
 
-The image contains the root filesystem, kernel, GRUB, and a copy of rootfs.tar so it can act as an installer environment.
+The image contains the root filesystem, kernel, GRUB boot files, and a copy of rootfs.tar so it can act as an installer environment.
 
 ## Install
 
@@ -129,6 +129,8 @@ The installer asks for:
 - passwords
 - yspm repository
 - bootloader
+
+Guided partitioning uses GPT with a 512 MiB EFI System Partition and the remaining space for an ext4 root filesystem.
 
 See [docs/INSTALL.md](docs/INSTALL.md).
 
@@ -217,25 +219,23 @@ root/
   var/
 ~~~
 
-Package recipes in build.native use yspm to produce native packages.
-
-See [repo/README.md](repo/README.md) and the yspm project for the package metadata contract.
+Package recipes in build.native/ use yspm to produce native packages.
 
 ## Binary repository
 
-The repository currently contains legacy binary archives.
+The repository currently contains a large legacy binary collection under repo/.
 
 The migration tool can create a native yspm repository:
 
 ~~~bash
 python3 tools/migrate-legacy-repo.py \
-  --input . \
+  --input repo \
   --output repo-yspm/releases/1 \
   --base-url https://example.org/hardcorelinux/releases/1 \
   --yspm /tmp/yspm
 ~~~
 
-A release can then publish:
+A release can publish:
 
 ~~~text
 repo-index.json
@@ -270,7 +270,7 @@ The release workflow:
 
 1. builds yspm
 2. builds the root filesystem
-3. extracts the kernel
+3. extracts the repository kernel archive
 4. creates a UEFI image
 5. converts legacy packages to yspkg
 6. generates the native repository index
@@ -289,10 +289,15 @@ sudo sh /usr/bin/hc-bench
 
 See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
+## Troubleshooting
+
+See [FAQ and Troubleshooting](docs/FAQ.md) for installer, musl, network, audio, yspm, and desktop issues.
+
 ## Documentation
 
 - [Installation](docs/INSTALL.md)
 - [Desktop Setup](docs/DESKTOP.md)
+- [FAQ and Troubleshooting](docs/FAQ.md)
 - [Benchmarks](docs/BENCHMARKS.md)
 - [Showcase](docs/SHOWCASE.md)
 - [Native Repository](repo/README.md)
