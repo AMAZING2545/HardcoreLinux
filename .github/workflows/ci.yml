@@ -159,11 +159,14 @@ jobs:
           ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
           test -s "$ISO"
 
-          BOOT_FILES="$(xorriso -indev "$ISO" -find /boot -type f)"
-          printf '%s\\n' "$BOOT_FILES"
+          mkdir -p iso-root
+          xorriso -osirrox on -indev "$ISO" -extract /boot iso-root/boot
+          test -s iso-root/boot/vmlinuz
+          test -s iso-root/boot/initramfs.img
+          test -s iso-root/boot/grub/grub.cfg
+          xorriso -indev "$ISO" -report_el_torito plain
 
-          printf '%s\\n' "$BOOT_FILES" | grep -qx '/boot/vmlinuz'
-          printf '%s\\n' "$BOOT_FILES" | grep -qx '/boot/initramfs.img'
+          sha256sum "$ISO" | tee "$ISO.sha256"
 
       - name: Boot ISO in QEMU
         run: |
