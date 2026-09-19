@@ -124,7 +124,7 @@ jobs:
 
       - name: Build and verify kernel
         run: |
-          sudo sh tools/build-kernel /tmp/vmlinuz /tmp/kernel-modules
+          sudo sh tools/build-kernel /tmp/vmlinuz /tmp/kernel-modules /tmp/kernel-firmware
           file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
           test -s /tmp/vmlinuz
           test -d /tmp/kernel-modules/lib/modules
@@ -137,6 +137,7 @@ jobs:
           ROOTFS: /tmp/rootfs
           OUTPUT: /tmp/rootfs.tar
           KERNEL_MODULES_DIR: /tmp/kernel-modules
+          KERNEL_FIRMWARE_DIR: /tmp/kernel-firmware
           DISTRO_VERSION: ci-${{ github.run_number }}
         run: sudo -E sh build/rootfs.build
 
