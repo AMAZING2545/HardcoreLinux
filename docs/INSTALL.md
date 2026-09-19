@@ -1,6 +1,6 @@
-# Installing Hardcore Linux
+# Installing Obsidian Core Linux
 
-Hardcore Linux includes a live ISO and a small interactive installer for UEFI x86_64 systems.
+Obsidian Core Linux includes a live ISO and a small interactive installer for UEFI x86_64 systems.
 
 The installer is intentionally simple and explicit. It shows the detected disks before any destructive operation and asks for every important system setting.
 
@@ -18,7 +18,7 @@ Back up important data.
 
 You need:
 
-- a booted Hardcore Linux live environment
+- a booted Obsidian Core Linux live environment
 - a root shell
 - an EFI System Partition
 - a Linux root partition
@@ -69,7 +69,7 @@ The root partition may optionally be formatted as ext4.
 
 GRUB is supported for x86_64 UEFI.
 
-systemd-boot is supported when bootctl is available in the live environment. systemd-boot is only the bootloader; Hardcore Linux continues to use its own /etc/init.
+systemd-boot is supported when bootctl is available in the live environment. systemd-boot is only the bootloader; Obsidian Core Linux continues to use its own /etc/init.
 
 ## User and root accounts
 
