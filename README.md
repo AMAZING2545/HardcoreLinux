@@ -88,6 +88,8 @@ sudo sh tools/build-iso build/rootfs.tar /tmp/vmlinuz ObsidianCoreLinux.iso
 
 Boot the live ISO in UEFI x86_64 mode.
 
+The ISO CI pipeline publishes a downloadable GitHub Actions artifact only after the image passes ISO structure checks and a UEFI QEMU boot test. A SHA-256 digest is generated alongside the ISO for integrity verification.
+
 The live environment launches the interactive installer on tty1. It supports guided GPT partitioning or manual partitions, configures the first user, writes filesystem mounts, installs the bootloader, and removes the live-only marker from the installed system.
 
 See docs/INSTALL.md.
