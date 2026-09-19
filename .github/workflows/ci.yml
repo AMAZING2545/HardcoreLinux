@@ -13,19 +13,65 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install validation tools
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
+
       - name: Shell syntax
         run: |
           set -eu
-          for file in             tools/hc-installer             tools/hc-setup-desktop             tools/hc-release-checksums             tools/bench-system             tools/build-yspm             tools/extract-kernel             tools/build-image             tools/run-qemu             tools/run-iso             tools/hc-doctor             tools/hc-recovery             tools/obsidian-first-login             tools/migrate-independent.sh             tools/build-native-meson             tools/build-native-configure             build/rootfs.build             build/rootfs_build/init             build/rootfs_build/initctl             build/rootfs_build/scripts/00000-eth0-dhcp; do
+          for file in \
+            tools/hc-installer \
+            tools/hc-setup-desktop \
+            tools/hc-setup-gnome \
+            tools/hc-release-checksums \
+            tools/bench-system \
+            tools/build-yspm \
+            tools/extract-kernel \
+            tools/build-image \
+            tools/build-iso \
+            tools/run-qemu \
+            tools/run-iso \
+            tools/hc-doctor \
+            tools/hc-recovery \
+            tools/obsidian-first-login \
+            tools/migrate-independent.sh \
+            tools/build-native-meson \
+            tools/build-native-configure \
+            build/rootfs.build \
+            build/rootfs_build/init \
+            build/rootfs_build/initctl \
+            build/rootfs_build/scripts/00000-eth0-dhcp; do
               sh -n "$file"
           done
+
       - name: ShellCheck
         run: |
-          shellcheck -S error             tools/hc-installer             tools/hc-setup-desktop             tools/hc-release-checksums             tools/bench-system             tools/build-yspm             tools/extract-kernel             tools/build-image             tools/run-qemu             tools/run-iso             tools/hc-doctor             tools/hc-recovery             tools/obsidian-first-login             tools/migrate-independent.sh             tools/build-native-meson             tools/build-native-configure             build/rootfs.build             build/rootfs_build/init             build/rootfs_build/initctl             build/rootfs_build/scripts/00000-eth0-dhcp
+          shellcheck -S error \
+            tools/hc-installer \
+            tools/hc-setup-desktop \
+            tools/hc-setup-gnome \
+            tools/hc-release-checksums \
+            tools/bench-system \
+            tools/build-yspm \
+            tools/extract-kernel \
+            tools/build-image \
+            tools/build-iso \
+            tools/run-qemu \
+            tools/run-iso \
+            tools/hc-doctor \
+            tools/hc-recovery \
+            tools/obsidian-first-login \
+            tools/migrate-independent.sh \
+            tools/build-native-meson \
+            tools/build-native-configure \
+            build/rootfs.build \
+            build/rootfs_build/init \
+            build/rootfs_build/initctl \
+            build/rootfs_build/scripts/00000-eth0-dhcp
+
       - name: Python syntax
         run: python3 -m py_compile tools/migrate-legacy-repo.py
 
@@ -45,7 +91,17 @@ jobs:
       - name: Install ISO and VM tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends             cpio             file             gzip             grub-efi-amd64-bin             grub-pc-bin             grub2-common             mtools             ovmf             qemu-system-x86             xorriso
+          sudo apt-get install -y --no-install-recommends \
+            cpio \
+            file \
+            gzip \
+            grub-efi-amd64-bin \
+            grub-pc-bin \
+            grub2-common \
+            mtools \
+            ovmf \
+            qemu-system-x86 \
+            xorriso
 
       - name: Build yspm
         env:
@@ -66,11 +122,14 @@ jobs:
       - name: Extract and verify kernel
         run: |
           sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
-          file -b /tmp/vmlinuz | grep -qi 'Linux kernel'
+          file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
 
       - name: Build live ISO
         run: |
-          sudo sh tools/build-iso             /tmp/rootfs.tar             /tmp/vmlinuz             "${{ github.workspace }}/ObsidianCoreLinux-${{ github.sha }}.iso"
+          sudo sh tools/build-iso \
+            /tmp/rootfs.tar \
+            /tmp/vmlinuz \
+            "${{ github.workspace }}/ObsidianCoreLinux-${{ github.sha }}.iso"
 
       - name: Verify ISO and initramfs
         run: |
@@ -88,6 +147,7 @@ jobs:
 
           gzip -t iso-root/boot/initramfs.img
           gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null
+
           grep -Eq '(^|/)init$' initramfs.list
           grep -Eq '(^|/)bin/sh$' initramfs.list
           grep -Eq '(^|/)etc/init$' initramfs.list
@@ -101,11 +161,22 @@ jobs:
         run: |
           set -eu
           ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
-          OVMF_CODE="$(find /usr/share -type f ( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' ) | head -n 1)"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) -print -quit)"
           test -n "$OVMF_CODE"
 
           set +e
-          timeout --kill-after=5s 30s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cpu max             -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE"             -cdrom "$ISO"             -boot d             -no-reboot             -display none             -serial stdio             > qemu-uefi.log 2>&1
+          timeout --kill-after=5s 30s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cpu max \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
+            -cdrom "$ISO" \
+            -boot d \
+            -no-reboot \
+            -display none \
+            -serial stdio \
+            > qemu-uefi.log 2>&1
           rc=$?
           set -e
 
@@ -121,7 +192,16 @@ jobs:
           ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
 
           set +e
-          timeout --kill-after=5s 30s qemu-system-x86_64             -machine q35             -m 1024             -smp 2             -cdrom "$ISO"             -boot d             -no-reboot             -display none             -serial stdio             > qemu-bios.log 2>&1
+          timeout --kill-after=5s 30s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cdrom "$ISO" \
+            -boot d \
+            -no-reboot \
+            -display none \
+            -serial stdio \
+            > qemu-bios.log 2>&1
           rc=$?
           set -e
 
