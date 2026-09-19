@@ -3,8 +3,7 @@ set -u
 
 echo "Obsidian Core Linux init"
 
-mount -t proc proc /proc
- 2>/dev/null || true
+mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
 mkdir -p /dev/pts /dev/mqueue /run /tmp /system/tmp /run/user
 mount -t devpts devpts /dev/pts 2>/dev/null || true
@@ -17,8 +16,6 @@ if grep -qw 'obsidian.recovery=1' /proc/cmdline 2>/dev/null; then
     echo "[  ok  ] recovery mode requested"
     exec /usr/bin/hc-recovery
 fi
-
-
 
 [ -f /etc/profile ] && . /etc/profile
 [ -f /etc/hostname ] && hostname "$(cat /etc/hostname)" 2>/dev/null || true
@@ -82,8 +79,19 @@ fi
 
 if [ -f /etc/hc-live ]; then
     echo "[  ok  ] live environment"
-    echo "[  ok  ] starting installer on tty1"
-    setsid sh /usr/sbin/hc-installer </dev/tty1 >/dev/tty1 2>&1 &
+    LIVE_TTY=/dev/tty1
+    CMDLINE=$(cat /proc/cmdline 2>/dev/null || true)
+    case " $CMDLINE " in
+        *" console=ttyS0"*) LIVE_TTY=/dev/ttyS0 ;;
+        *) ;;
+    esac
+
+    if [ ! -e "$LIVE_TTY" ] && [ -e /dev/console ]; then
+        LIVE_TTY=/dev/console
+    fi
+
+    echo "[  ok  ] starting installer on $LIVE_TTY"
+    setsid sh /usr/sbin/hc-installer <"$LIVE_TTY" >"$LIVE_TTY" 2>&1 &
 fi
 
 if [ ! -f /etc/hc-live ]; then
