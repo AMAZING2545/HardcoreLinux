@@ -1,7 +1,12 @@
 #!/bin/sh
 set -u
 
-echo "Hardcore Linux init"
+echo "Obsidian Core Linux init"
+
+if grep -qw 'obsidian.recovery=1' /proc/cmdline 2>/dev/null; then
+    echo "[  ok  ] recovery mode requested"
+    exec /usr/bin/hc-recovery
+fi
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
