@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted gnome-keyring source tree}"
+: "${YSPM_BIN:=yspm}"
+
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-gnome-keyring-48.0-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson"  "$dir" "$OUT" "gnome-keyring" "48.0" "GNOME keyring and secret service"
