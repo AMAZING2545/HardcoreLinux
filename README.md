@@ -60,7 +60,7 @@ After installation:
 
 ~~~bash
 sudo yspm update
-sudo yspm install sway
+sudo yspm install gnome-shell
 sudo yspm upgrade
 ~~~
 
@@ -112,6 +112,17 @@ sudo sh tools/build-image \
 
 The image contains the root filesystem, kernel, GRUB boot files, and a copy of rootfs.tar so it can act as an installer environment.
 
+Build a live ISO:
+
+~~~bash
+sudo sh tools/build-iso \
+  build/rootfs.tar \
+  /tmp/vmlinuz \
+  HardcoreLinux.iso
+~~~
+
+The ISO boots a live Hardcore Linux environment directly from an initramfs and starts the installer on tty1.
+
 ## Install
 
 Boot the image on a UEFI x86_64 machine and run:
@@ -136,27 +147,17 @@ See [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Desktop setup
 
+GNOME is the default graphical environment.
+
 After the first boot:
 
 ~~~bash
 sudo sh /usr/sbin/hc-setup-desktop
 ~~~
 
-The wizard can install:
+The GNOME profile installs the desktop shell, session, settings components, display manager, portal stack, file manager, core applications, audio stack, networking, storage integration, and desktop permissions.
 
-~~~text
-Sway
-labwc
-foot
-wofi
-waybar
-ly
-PipeWire
-WirePlumber
-iwd
-udev
-D-Bus
-~~~
+A lightweight labwc profile remains available for low-resource systems.
 
 See [docs/DESKTOP.md](docs/DESKTOP.md).
 
@@ -271,11 +272,12 @@ The release workflow:
 1. builds yspm
 2. builds the root filesystem
 3. extracts the repository kernel archive
-4. creates a UEFI image
-5. converts legacy packages to yspkg
-6. generates the native repository index
-7. publishes packages and the image
-8. publishes SHA-256 checksums
+4. creates a UEFI disk image
+5. creates a live ISO
+6. converts legacy packages to yspkg
+7. generates the native repository index
+8. publishes the image, ISO, and packages
+9. publishes SHA-256 checksums
 
 ## Benchmarks
 
