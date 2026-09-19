@@ -46,5 +46,6 @@ send "root123\r"
 expect "Retype password:"
 send "root123\r"
 expect "Installation completed."
-exec pkill -TERM -f "qemu-system-x86_64.*test-disk.img"
+set qemu_pid [exp_pid]
+exec kill -TERM $qemu_pid
 expect eof
