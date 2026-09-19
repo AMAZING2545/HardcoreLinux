@@ -92,7 +92,7 @@ case "$MODE" in
         [ "$ESP_SIZE" -ge "$ESP_IMAGE_SIZE" ] || die "EFI partition is smaller than the embedded boot image"
 
         printf '%s\n' 'Installing embedded EFI filesystem...'
-        dd if="$EFI_IMAGE" of="$ESP" bs=4M conv=fsync,status=none
+        dd if="$EFI_IMAGE" of="$ESP" bs=4M conv=fsync >/dev/null 2>&1
         mkfs.ext4 -F -L OBSIDIAN "$ROOT"
         ;;
     manual)
