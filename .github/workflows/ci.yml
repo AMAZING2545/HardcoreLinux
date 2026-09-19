@@ -184,7 +184,8 @@ jobs:
             exit 1
           }
 
-          cpio -it < iso-root/boot/initramfs.img > initramfs.list 2>/dev/null || {
+          gzip -t iso-root/boot/initramfs.img
+          gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null || {
             echo "initramfs cpio listing failed"
             exit 1
           }
