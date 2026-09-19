@@ -49,7 +49,7 @@ mkdir -p "$ROOTFS/usr/share/obsidian-core-linux/profiles"
 
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
 cp "$BUILD_DIR/rootfs_build/initctl" "$ROOTFS/sbin/initctl"
-cp "$BUILD_DIR/rootfs_build/scripts/." "$ROOTFS/system/scripts/"
+cp -a "$BUILD_DIR/rootfs_build/scripts/." "$ROOTFS/system/scripts/"
 if [ -d "$BUILD_DIR/rootfs_build/services" ]; then
     cp -a "$BUILD_DIR/rootfs_build/services/." "$ROOTFS/system/services/"
 fi
