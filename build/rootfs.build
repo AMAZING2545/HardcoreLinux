@@ -45,7 +45,7 @@ mkdir -p "$ROOTFS/etc" "$ROOTFS/usr/bin" "$ROOTFS/usr/sbin" "$ROOTFS/sbin"
 mkdir -p "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"
 mkdir -p "$ROOTFS/system/tmp" "$ROOTFS/var/lib/yspm" "$ROOTFS/var/cache/yspm"
 mkdir -p "$ROOTFS/etc/yspm" "$ROOTFS/etc/profile.d" "$ROOTFS/run/user"
-mkdir -p "$ROOTFS/usr/share/hardcore-linux/profiles"
+mkdir -p "$ROOTFS/usr/share/obsidian-core-linux/profiles"
 
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
 cp "$BUILD_DIR/rootfs_build/initctl" "$ROOTFS/sbin/initctl"
@@ -56,8 +56,8 @@ fi
 if [ -d "$BUILD_DIR/rootfs_build/drivers" ]; then
     cp -a "$BUILD_DIR/rootfs_build/drivers/." "$ROOTFS/system/drivers/"
 fi
-cp "$REPO_DIR/profiles/gnome.packages" "$ROOTFS/usr/share/hardcore-linux/profiles/gnome.packages"
-cp "$REPO_DIR/profiles/minimal-desktop.packages" "$ROOTFS/usr/share/hardcore-linux/profiles/minimal-desktop.packages"
+cp "$REPO_DIR/profiles/gnome.packages" "$ROOTFS/usr/share/obsidian-core-linux/profiles/gnome.packages"
+cp "$REPO_DIR/profiles/minimal-desktop.packages" "$ROOTFS/usr/share/obsidian-core-linux/profiles/minimal-desktop.packages"
 chmod 0755 "$ROOTFS/etc/init" "$ROOTFS/sbin/initctl"
 for tree in "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"; do
     if [ -d "$tree" ]; then
@@ -118,7 +118,7 @@ cat > "$ROOTFS/etc/profile.d/yspm.sh" <<'EOF'
 [ -f /etc/yspm/env ] && . /etc/yspm/env
 EOF
 
-YSPM_REPOSITORY_URL="${YSPM_REPOSITORY_URL:-https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json}"
+YSPM_REPOSITORY_URL="${YSPM_REPOSITORY_URL:-https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json}"
 cat > "$ROOTFS/etc/yspm/env" <<EOF
 export YSPM_REPOSITORY='$YSPM_REPOSITORY_URL'
 export YSPM_ROOT='/'
@@ -127,14 +127,14 @@ export YSPM_CACHE_DIR='/var/cache/yspm'
 EOF
 
 cat > "$ROOTFS/etc/os-release" <<EOF
-NAME="Hardcore Linux"
+NAME="Obsidian Core Linux"
 VERSION="$DISTRO_VERSION"
-ID=hardcore
+ID=obsidiancore
 ID_LIKE=alpine
-PRETTY_NAME="Hardcore Linux $DISTRO_VERSION"
+PRETTY_NAME="Obsidian Core Linux $DISTRO_VERSION"
 ANSI_COLOR="36"
-HOME_URL="https://github.com/Yassine-Jemi01/HardcoreLinux"
-BUG_REPORT_URL="https://github.com/Yassine-Jemi01/HardcoreLinux/issues"
+HOME_URL="https://github.com/Yassine-Jemi01/ObsidianCoreLinux"
+BUG_REPORT_URL="https://github.com/Yassine-Jemi01/ObsidianCoreLinux/issues"
 EOF
 
 : > "$ROOTFS/etc/hc-live"
