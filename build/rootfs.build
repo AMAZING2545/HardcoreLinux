@@ -49,7 +49,7 @@ mkdir -p "$ROOTFS/usr/share/obsidian-core-linux/profiles"
 
 cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
 cp "$BUILD_DIR/rootfs_build/initctl" "$ROOTFS/sbin/initctl"
-cp "$BUILD_DIR/rootfs_build/scripts/." "$ROOTFS/system/scripts/"
+cp -a "$BUILD_DIR/rootfs_build/scripts/." "$ROOTFS/system/scripts/"
 if [ -d "$BUILD_DIR/rootfs_build/services" ]; then
     cp -a "$BUILD_DIR/rootfs_build/services/." "$ROOTFS/system/services/"
 fi
@@ -126,7 +126,7 @@ cat > "$ROOTFS/etc/profile.d/yspm.sh" <<'EOF'
 [ -f /etc/yspm/env ] && . /etc/yspm/env
 EOF
 
-YSPM_REPOSITORY_URL="${YSPM_REPOSITORY_URL:-https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json}"
+YSPM_REPOSITORY_URL="${YSPM_REPOSITORY_URL:-https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json}"
 cat > "$ROOTFS/etc/yspm/env" <<EOF
 export YSPM_REPOSITORY='$YSPM_REPOSITORY_URL'
 export YSPM_ROOT='/'
