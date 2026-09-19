@@ -45,7 +45,7 @@ jobs:
       - name: Build root filesystem
         env:
           YSPM_BIN: /tmp/yspm
-          YSPM_REPOSITORY_URL: https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json
+          YSPM_REPOSITORY_URL: https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json
           YSPM_ARCHIVE_DIR: ${{ github.workspace }}/repo
           ROOTFS: /tmp/rootfs
           OUTPUT: /tmp/rootfs.tar
@@ -64,7 +64,7 @@ jobs:
           sudo sh tools/build-image \
             /tmp/rootfs.tar \
             /tmp/vmlinuz \
-            "$PWD/HardcoreLinux-$GITHUB_REF_NAME.img" \
+            "$PWD/ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
             2G
 
       - name: Build live ISO
@@ -72,7 +72,7 @@ jobs:
           sudo sh tools/build-iso \
             /tmp/rootfs.tar \
             /tmp/vmlinuz \
-            "$PWD/HardcoreLinux-$GITHUB_REF_NAME.iso"
+            "$PWD/ObsidianCoreLinux-$GITHUB_REF_NAME.iso"
 
       - name: Build native package repository
         run: |
@@ -80,7 +80,7 @@ jobs:
           python3 tools/migrate-legacy-repo.py \
             --input repo \
             --output repo-yspm/releases/1 \
-            --base-url "https://github.com/Yassine-Jemi01/HardcoreLinux/releases/download/$GITHUB_REF_NAME" \
+            --base-url "https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/download/$GITHUB_REF_NAME" \
             --release 1 \
             --abi yspm-abi-1 \
             --arch x86_64 \
@@ -91,7 +91,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            --title "Hardcore Linux $GITHUB_REF_NAME" \
+            --title "Obsidian Core Linux $GITHUB_REF_NAME" \
             --generate-notes
 
       - name: Upload image and repository index
@@ -100,8 +100,8 @@ jobs:
         run: |
           cp repo-yspm/releases/1/index.json repo-index.json
           gh release upload "$GITHUB_REF_NAME" \
-            "HardcoreLinux-$GITHUB_REF_NAME.img" \
-            "HardcoreLinux-$GITHUB_REF_NAME.iso" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
             repo-index.json \
             --clobber
 
@@ -115,8 +115,8 @@ jobs:
       - name: Generate release checksums
         run: |
           sha256sum \
-            "HardcoreLinux-$GITHUB_REF_NAME.img" \
-            "HardcoreLinux-$GITHUB_REF_NAME.iso" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.img" \
+            "ObsidianCoreLinux-$GITHUB_REF_NAME.iso" \
             repo-index.json > SHA256SUMS
 
       - name: Upload checksums
