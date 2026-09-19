@@ -15,7 +15,7 @@ ROOTFS=$1
 KERNEL=$2
 OUTPUT=$3
 
-for cmd in tar cpio gzip grub-mkrescue grub-mkstandalone mkfs.fat mmd mcopy mktemp find cp mkdir chmod truncate; do
+for cmd in tar cpio grub-mkrescue grub-mkstandalone mkfs.fat mmd mcopy mktemp find cp mkdir chmod truncate; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "build-iso: missing command: $cmd" >&2
         exit 1
@@ -80,7 +80,7 @@ cp "$WORK/esp/efi.img" "$WORK/live/boot/efi.img"
 
 (
     cd "$WORK/live"
-    find . -print | cpio -o -H newc 2>/dev/null | gzip -9 > "$WORK/iso/boot/initramfs.img"
+    find . -print | cpio -o -H newc 2>/dev/null > "$WORK/iso/boot/initramfs.img"
 )
 
 cp "$KERNEL" "$WORK/iso/boot/vmlinuz"
