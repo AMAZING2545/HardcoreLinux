@@ -1,0 +1,10 @@
+#!/bin/sh
+set -u
+
+printf '%s\n' 'Obsidian Core Linux recovery shell'
+printf '%s\n' 'This mode does not modify the system automatically.'
+printf '%s\n\n' 'Useful commands: hc-doctor, yspm check, yspm history, initctl list'
+printf '%s\n' 'Mounted filesystems:'
+mount 2>/dev/null || true
+printf '\n%s\n' 'Press Ctrl-D to return to the normal boot sequence.'
+exec /bin/sh

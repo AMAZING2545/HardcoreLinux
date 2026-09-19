@@ -1,0 +1,57 @@
+#!/bin/sh
+set -eu
+
+[ "$#" -ge 2 ] || {
+    echo "usage: extract-kernel <archive.tar> <output>" >&2
+    exit 2
+}
+
+ARCHIVE=$1
+OUTPUT=$2
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT INT TERM
+
+for cmd in tar find file head cp chmod; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "extract-kernel: missing command: $cmd" >&2
+        exit 1
+    }
+done
+
+[ -f "$ARCHIVE" ] || {
+    echo "extract-kernel: archive not found: $ARCHIVE" >&2
+    exit 1
+}
+
+tar -xf "$ARCHIVE" -C "$TMP"
+
+KERNEL=
+while IFS= read -r candidate; do
+    kind=$(file -b "$candidate" 2>/dev/null || true)
+
+    case "$kind" in
+        *"Linux kernel x86 boot executable"*|*"Linux kernel x86 boot executable bzImage"*)
+            case "$candidate" in
+                *.efi|*/EFI/*|*/efi/*|*/BOOTX64.EFI|*/BOOTIA32.EFI)
+                    continue
+                    ;;
+            esac
+            KERNEL=$candidate
+            break
+            ;;
+    esac
+done <<EOF
+$(find "$TMP" -type f -size +1M -print)
+EOF
+
+[ -n "$KERNEL" ] || {
+    echo "extract-kernel: no Linux x86 kernel image found in $ARCHIVE" >&2
+    echo "extract-kernel: archive candidates:" >&2
+    find "$TMP" -type f -size +1M -printf '%P\n' | head -n 80 >&2
+    exit 1
+}
+
+cp "$KERNEL" "$OUTPUT"
+chmod 0644 "$OUTPUT"
+printf 'kernel: %s\n' "$KERNEL"
+printf '%s\n' "$OUTPUT"

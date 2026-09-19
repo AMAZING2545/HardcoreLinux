@@ -1,0 +1,42 @@
+#!/bin/sh
+set -eu
+
+IMAGE="${1:-HardcoreLinux.img}"
+RAM="${RAM:-1024}"
+CPUS="${CPUS:-2}"
+
+command -v qemu-system-x86_64 >/dev/null 2>&1 || {
+    echo "run-qemu: qemu-system-x86_64 is required" >&2
+    exit 1
+}
+
+[ -f "$IMAGE" ] || {
+    echo "run-qemu: image not found: $IMAGE" >&2
+    exit 1
+}
+
+OVMF_CODE=""
+for candidate in \
+    /usr/share/OVMF/OVMF_CODE.fd \
+    /usr/share/edk2/x64/OVMF_CODE.fd \
+    /usr/share/edk2-ovmf/x64/OVMF_CODE.fd; do
+    if [ -f "$candidate" ]; then
+        OVMF_CODE="$candidate"
+        break
+    fi
+done
+
+[ -n "$OVMF_CODE" ] || {
+    echo "run-qemu: OVMF firmware is required for UEFI boot" >&2
+    exit 1
+}
+
+exec qemu-system-x86_64 \
+    -machine q35 \
+    -enable-kvm \
+    -cpu host \
+    -smp "$CPUS" \
+    -m "$RAM" \
+    -drive "if=pflash,format=raw,readonly=on,file=$OVMF_CODE" \
+    -drive "format=raw,file=$IMAGE" \
+    -serial mon:stdio

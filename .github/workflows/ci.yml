@@ -1,0 +1,352 @@
+# Final release qualification: build, install, verify, and boot-test.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Shell syntax
+        run: |
+          set -eu
+          for file in \
+            tools/hc-installer \
+            tools/hc-setup-desktop \
+            tools/hc-setup-gnome \
+            tools/hc-release-checksums \
+            tools/bench-system \
+            tools/build-yspm \
+            tools/build-kernel \
+            tools/extract-kernel \
+            tools/build-image \
+            tools/build-iso \
+            tools/run-qemu \
+            tools/run-iso \
+            tools/hc-doctor \
+            tools/hc-recovery \
+            tools/obsidian-first-login \
+            tools/migrate-independent.sh \
+            tools/build-native-meson \
+            tools/build-native-configure \
+            tools/build-kernel \
+            build/rootfs.build \
+            build/rootfs_build/init \
+            build/rootfs_build/initctl \
+            build/rootfs_build/scripts/00000-eth0-dhcp; do
+              sh -n "$file"
+          done
+
+      - name: ShellCheck
+        run: |
+          shellcheck -S error \
+            tools/hc-installer \
+            tools/hc-setup-desktop \
+            tools/hc-setup-gnome \
+            tools/hc-release-checksums \
+            tools/bench-system \
+            tools/build-yspm \
+            tools/extract-kernel \
+            tools/build-image \
+            tools/build-iso \
+            tools/run-qemu \
+            tools/run-iso \
+            tools/hc-doctor \
+            tools/hc-recovery \
+            tools/obsidian-first-login \
+            tools/migrate-independent.sh \
+            tools/build-native-meson \
+            tools/build-native-configure \
+            build/rootfs.build \
+            build/rootfs_build/init \
+            build/rootfs_build/initctl \
+            build/rootfs_build/scripts/00000-eth0-dhcp
+
+      - name: Python syntax
+        run: python3 -m py_compile tools/migrate-legacy-repo.py
+
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install ISO and VM tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            busybox-static \
+            bc \
+            bison \
+            build-essential \
+            cpio \
+            dosfstools \
+            expect \
+            file \
+            flex \
+            gzip \
+            grub-common \
+            grub-efi-amd64-bin \
+            grub-pc-bin \
+            grub2-common \
+            libelf-dev \
+            libssl-dev \
+            mtools \
+            ovmf \
+            qemu-system-x86 \
+            xorriso \
+            xz-utils \
+            curl
+
+      - name: Build yspm
+        env:
+          YSPM_OUTPUT: /tmp/yspm
+          YSPM_REF: 824b39de2758f5434889b7814888cad2f6a4f16a
+        run: sh tools/build-yspm
+
+      - name: Build and verify kernel
+        run: |
+          sudo sh tools/build-kernel /tmp/vmlinuz /tmp/kernel-modules /tmp/kernel-firmware
+          file -b /tmp/vmlinuz | grep -Eqi 'Linux kernel'
+          test -s /tmp/vmlinuz
+          test -d /tmp/kernel-modules/lib/modules
+          test -d /tmp/kernel-firmware/lib/firmware
+          find /tmp/kernel-firmware/lib/firmware -type f -print -quit | grep -q .
+
+      - name: Build root filesystem
+        env:
+          YSPM_BIN: /tmp/yspm
+          YSPM_REPOSITORY_URL: https://github.com/${{ github.repository }}/releases/latest/download/repo-index.json
+          YSPM_ARCHIVE_DIR: ${{ github.workspace }}/repo
+          ROOTFS: /tmp/rootfs
+          OUTPUT: /tmp/rootfs.tar
+          KERNEL_MODULES_DIR: /tmp/kernel-modules
+          KERNEL_FIRMWARE_DIR: /tmp/kernel-firmware
+          DISTRO_VERSION: ci-${{ github.run_number }}
+        run: sudo -E sh build/rootfs.build
+
+      - name: Build live ISO
+        run: |
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          sudo sh tools/build-iso /tmp/rootfs.tar /tmp/vmlinuz "$PWD/$ISO"
+          test -s "$ISO"
+
+      - name: Verify ISO payload
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+
+          rm -rf iso-root live-root efi-check
+          mkdir -p iso-root live-root efi-check
+          xorriso -osirrox on -indev "$ISO" -extract /boot iso-root/boot
+          xorriso -osirrox on -indev "$ISO" -extract /live live-root/live
+
+          test -s live-root/live/bin/sh
+          test -s live-root/live/etc/init
+          test -f live-root/live/etc/hc-live
+          test -s live-root/live/usr/sbin/hc-installer
+
+          for path in \
+            iso-root/boot/vmlinuz \
+            iso-root/boot/initramfs.img \
+            iso-root/boot/grub/grub.cfg \
+            iso-root/boot/BOOTX64.EFI \
+            iso-root/boot/efi.img; do
+            test -s "$path" || {
+              echo "missing ISO file: $path"
+              exit 1
+            }
+          done
+
+          mcopy -i iso-root/boot/efi.img ::/EFI/BOOT/BOOTX64.EFI efi-check/BOOTX64.EFI || {
+            echo "embedded EFI filesystem does not contain EFI/BOOT/BOOTX64.EFI"
+            exit 1
+          }
+          test -s efi-check/BOOTX64.EFI || {
+            echo "extracted EFI loader is empty"
+            exit 1
+          }
+
+          KERNEL_TYPE="$(file -b iso-root/boot/vmlinuz)"
+          echo "kernel file type: $KERNEL_TYPE"
+          printf '%s\\n' "$KERNEL_TYPE" | grep -Eqi 'Linux kernel' || {
+            echo "ISO kernel is not recognized as a Linux kernel"
+            exit 1
+          }
+
+          gzip -t iso-root/boot/initramfs.img
+          gzip -dc iso-root/boot/initramfs.img | cpio -t > initramfs.list 2>/dev/null || {
+            echo "initramfs cpio listing failed"
+            exit 1
+          }
+
+          INITRAMFS_SIZE="$(stat -c %s iso-root/boot/initramfs.img)"
+          test "$INITRAMFS_SIZE" -lt $((128 * 1024 * 1024)) || {
+            echo "initramfs is unexpectedly large: $INITRAMFS_SIZE bytes"
+            exit 1
+          }
+
+          for member in init bin/busybox bin/sh; do
+            grep -Eq "(^|/)${member}$" initramfs.list || {
+              echo "missing initramfs member: ${member}"
+              tail -n 80 initramfs.list || true
+              exit 1
+            }
+          done
+
+          xorriso -indev "$ISO" -report_el_torito plain
+          sha256sum "$ISO" > "$ISO.sha256"
+          sha256sum -c "$ISO.sha256"
+
+      - name: Boot live ISO in UEFI QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) -print -quit)"
+          test -n "$OVMF_CODE"
+
+          set +e
+          timeout --kill-after=5s 30s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cpu max \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
+            -cdrom "$ISO" \
+            -boot d \
+            -no-reboot \
+            -display none \
+            -serial stdio \
+            > qemu-live-uefi.log 2>&1
+          rc=$?
+          set -e
+
+          cat qemu-live-uefi.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux init' qemu-live-uefi.log
+          grep -q 'Obsidian Core Linux installer' qemu-live-uefi.log
+
+      - name: Boot live ISO in BIOS QEMU
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+
+          set +e
+          timeout --kill-after=5s 30s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cdrom "$ISO" \
+            -boot d \
+            -no-reboot \
+            -display none \
+            -serial stdio \
+            > qemu-live-bios.log 2>&1
+          rc=$?
+          set -e
+
+          cat qemu-live-bios.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux init' qemu-live-bios.log
+          grep -q 'Obsidian Core Linux installer' qemu-live-bios.log
+
+      - name: Install ISO to virtual disk
+        run: |
+          set -eu
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) -print -quit)"
+          test -n "$OVMF_CODE"
+
+          truncate -s 2G test-disk.img
+          timeout --kill-after=10s 180s expect tools/ci-installer.expect \
+            "$ISO" "$OVMF_CODE" test-disk.img
+
+      - name: Verify installed system
+        run: |
+          set -eu
+          sudo losetup --find --show --partscan test-disk.img > loopdev
+          LOOP="$(cat loopdev)"
+
+          cleanup() {
+            sudo umount /mnt/obsidian-test/boot/efi 2>/dev/null || true
+            sudo umount /mnt/obsidian-test 2>/dev/null || true
+            sudo losetup -d "$LOOP" 2>/dev/null || true
+            sudo rm -rf /mnt/obsidian-test
+          }
+          trap cleanup EXIT
+
+          sudo mkdir -p /mnt/obsidian-test
+          sudo mount "${LOOP}p2" /mnt/obsidian-test
+          sudo test -s /mnt/obsidian-test/boot/vmlinuz
+          sudo test -s /mnt/obsidian-test/boot/grub/grub.cfg
+          sudo test -s /mnt/obsidian-test/etc/fstab
+
+          sudo mount "${LOOP}p1" /mnt/obsidian-test/boot/efi
+          sudo test -s /mnt/obsidian-test/boot/efi/EFI/BOOT/BOOTX64.EFI
+
+      - name: Boot installed system in UEFI QEMU
+        run: |
+          set -eu
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) -print -quit)"
+          test -n "$OVMF_CODE"
+
+          set +e
+          timeout --kill-after=5s 30s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cpu max \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
+            -drive file=test-disk.img,format=raw,if=ide \
+            -boot order=c \
+            -no-reboot \
+            -display none \
+            -serial stdio \
+            > qemu-installed.log 2>&1
+          rc=$?
+          set -e
+
+          cat qemu-installed.log
+          test "$rc" -eq 124
+          grep -q 'Obsidian Core Linux init' qemu-installed.log
+
+      - name: Upload verified ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload boot logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-boot-logs-${{ github.sha }}
+          path: |
+            qemu-live-uefi.log
+            qemu-live-bios.log
+            qemu-installed.log
+          if-no-files-found: error
+          retention-days: 90

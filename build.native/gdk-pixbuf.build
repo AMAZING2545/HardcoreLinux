@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted gdk-pixbuf source tree}"
+: "${YSPM_BIN:=yspm}"
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-gdk-pixbuf-2.42.12-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "gdk-pixbuf" "2.42.12" "Image loading library used by GTK"

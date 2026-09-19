@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted json-glib source tree}"
+: "${YSPM_BIN:=yspm}"
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-json-glib-1.10.8-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "json-glib" "1.10.8" "JSON support for GNOME applications"

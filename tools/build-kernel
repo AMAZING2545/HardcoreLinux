@@ -1,0 +1,215 @@
+#!/bin/sh
+set -eu
+
+KERNEL_PROVIDER="${KERNEL_PROVIDER:-alpine}"
+OUTPUT="${1:-/tmp/vmlinuz}"
+MODULES_OUTPUT="${2:-/tmp/kernel-modules}"
+FIRMWARE_OUTPUT="${3:-/tmp/kernel-firmware}"
+WORKDIR="${KERNEL_WORKDIR:-/tmp/obsidian-kernel}"
+
+die() {
+    echo "build-kernel: $*" >&2
+    exit 1
+}
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+build_alpine() {
+    ALPINE_VERSION="${ALPINE_VERSION:-3.24.2}"
+    ALPINE_KERNEL_VERSION="${ALPINE_KERNEL_VERSION:-6.18.52-r0}"
+    EXPORT_DIR="$WORKDIR/alpine-export"
+
+    need docker
+
+    rm -rf "$EXPORT_DIR"
+    mkdir -p "$EXPORT_DIR"
+
+    echo "using Alpine Linux $ALPINE_VERSION linux-lts $ALPINE_KERNEL_VERSION"
+
+    docker run --rm \
+        -v "$EXPORT_DIR:/out" \
+        "alpine:$ALPINE_VERSION" \
+        sh -euxc "
+            apk add --no-cache --no-progress 'linux-lts=$ALPINE_KERNEL_VERSION'
+            cp /boot/vmlinuz-lts /out/vmlinuz
+            mkdir -p /out/modules /out/firmware
+            cp -a /lib/modules/. /out/modules/
+            if [ -d /lib/firmware ]; then
+                cp -a /lib/firmware/. /out/firmware/
+            fi
+        "
+
+    [ -s "$EXPORT_DIR/vmlinuz" ] || die "Alpine kernel image was not exported"
+    [ -d "$EXPORT_DIR/modules" ] || die "Alpine kernel modules were not exported"
+
+    rm -rf "$MODULES_OUTPUT" "$FIRMWARE_OUTPUT"
+    mkdir -p "$MODULES_OUTPUT/lib" "$FIRMWARE_OUTPUT/lib"
+    cp -a "$EXPORT_DIR/modules" "$MODULES_OUTPUT/lib/modules"
+
+    mkdir -p "$FIRMWARE_OUTPUT/lib/firmware"
+    if [ -d "$EXPORT_DIR/firmware" ]; then
+        cp -a "$EXPORT_DIR/firmware/." "$FIRMWARE_OUTPUT/lib/firmware/"
+    fi
+
+    mkdir -p "$(dirname "$OUTPUT")"
+    install -m 0644 "$EXPORT_DIR/vmlinuz" "$OUTPUT"
+
+    echo "kernel: $OUTPUT"
+    echo "modules: $MODULES_OUTPUT/lib/modules"
+    echo "firmware: $FIRMWARE_OUTPUT/lib/firmware"
+}
+
+build_source() {
+    KERNEL_VERSION="${KERNEL_VERSION:-7.2.6}"
+    KERNEL_URL="${KERNEL_URL:-https://www.kernel.org/pub/linux/kernel/v7.x/linux-$KERNEL_VERSION.tar.xz}"
+    KERNEL_SHA256="${KERNEL_SHA256:-039aef84f2b0994aeda3f4fcfc3d02ec9d7a9bbb9020ea264c43f446c860f606}"
+    KERNEL_CONFIG="${KERNEL_CONFIG:-}"
+
+    for cmd in curl sha256sum tar make sed grep install getconf; do
+        need "$cmd"
+    done
+
+    mkdir -p "$WORKDIR"
+    ARCHIVE="$WORKDIR/linux-$KERNEL_VERSION.tar.xz"
+    SOURCE="$WORKDIR/linux-$KERNEL_VERSION"
+
+    if [ ! -f "$ARCHIVE" ]; then
+        echo "downloading Linux $KERNEL_VERSION source"
+        curl -fL --retry 3 --retry-delay 2 -o "$ARCHIVE" "$KERNEL_URL"
+    fi
+
+    echo "$KERNEL_SHA256  $ARCHIVE" | sha256sum -c -
+
+    if [ ! -d "$SOURCE" ]; then
+        tar -xJf "$ARCHIVE" -C "$WORKDIR"
+    fi
+
+    [ -d "$SOURCE" ] || die "kernel source tree was not extracted"
+
+    rm -rf "$MODULES_OUTPUT" "$FIRMWARE_OUTPUT"
+    mkdir -p "$MODULES_OUTPUT" "$FIRMWARE_OUTPUT/lib/firmware"
+
+    set_config() {
+        key="$1"
+        value="$2"
+        if grep -q "^# $key is not set$" "$SOURCE/.config"; then
+            sed -i "s|^# $key is not set$|$key=$value|" "$SOURCE/.config"
+        elif grep -q "^$key=" "$SOURCE/.config"; then
+            sed -i "s|^$key=.*|$key=$value|" "$SOURCE/.config"
+        else
+            printf '%s=%s\\n' "$key" "$value" >> "$SOURCE/.config"
+        fi
+    }
+
+    unset_config() {
+        key="$1"
+        if grep -q "^$key=" "$SOURCE/.config"; then
+            sed -i "s|^$key=.*|# $key is not set|" "$SOURCE/.config"
+        fi
+    }
+
+    set_string_config() {
+        key="$1"
+        value="$2"
+        if grep -q "^$key=" "$SOURCE/.config"; then
+            sed -i "s|^$key=.*|$key=\"$value\"|" "$SOURCE/.config"
+        elif grep -q "^# $key is not set$" "$SOURCE/.config"; then
+            sed -i "s|^# $key is not set$|$key=\"$value\"|" "$SOURCE/.config"
+        else
+            printf '%s="%s"\\n' "$key" "$value" >> "$SOURCE/.config"
+        fi
+    }
+
+    if [ -n "$KERNEL_CONFIG" ]; then
+        [ -f "$KERNEL_CONFIG" ] || die "kernel config not found: $KERNEL_CONFIG"
+        cp "$KERNEL_CONFIG" "$SOURCE/.config"
+    else
+        (
+            cd "$SOURCE"
+            make defconfig
+        )
+    fi
+
+    # The live ISO carries a raw cpio initramfs.
+    set_config CONFIG_BLK_DEV_INITRD y
+
+    # Never bake a machine-specific root device into the distribution kernel.
+    set_config CONFIG_CMDLINE_BOOL y
+    set_string_config CONFIG_CMDLINE ""
+    unset_config CONFIG_CMDLINE_OVERRIDE
+
+    # Core laptop/desktop hardening and hardware support.
+    set_config CONFIG_CPU_MITIGATIONS y
+    set_config CONFIG_ACPI y
+    set_config CONFIG_ACPI_BATTERY y
+    set_config CONFIG_ACPI_BUTTON y
+    set_config CONFIG_ACPI_THERMAL y
+    set_config CONFIG_CPU_FREQ y
+    set_config CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL y
+
+    # Required for the QEMU installer/installed-system test and common VM storage.
+    set_config CONFIG_VIRTIO y
+    set_config CONFIG_VIRTIO_PCI y
+    set_config CONFIG_VIRTIO_BLK y
+
+    # Common real-hardware storage and input/display/audio support.
+    set_config CONFIG_ATA y
+    set_config CONFIG_SATA_AHCI y
+    set_config CONFIG_EFI y
+    set_config CONFIG_EFI_STUB y
+    set_config CONFIG_EFI_PARTITION y
+    set_config CONFIG_DEVTMPFS y
+    set_config CONFIG_DEVTMPFS_MOUNT y
+    set_config CONFIG_EXT4_FS y
+    set_config CONFIG_ISO9660_FS y
+    set_config CONFIG_OVERLAY_FS y
+    set_config CONFIG_TMPFS y
+    set_config CONFIG_BLK_DEV_SR y
+    set_config CONFIG_SCSI y
+    set_config CONFIG_SCSI_CDROM y
+    set_config CONFIG_VFAT_FS y
+    set_config CONFIG_MSDOS_FS y
+    set_config CONFIG_USB_STORAGE y
+    set_config CONFIG_USB_UAS y
+    set_config CONFIG_USB_XHCI_HCD y
+    set_config CONFIG_USB_EHCI_HCD y
+    set_config CONFIG_HID_GENERIC y
+    set_config CONFIG_INPUT_EVDEV y
+    set_config CONFIG_DRM_I915 y
+    set_config CONFIG_DRM_FBDEV_EMULATION y
+    set_config CONFIG_SND_HDA_INTEL y
+    set_config CONFIG_SND_HDA_CODEC_HDMI y
+    set_config CONFIG_RFKILL y
+    set_config CONFIG_SERIAL_8250_CONSOLE y
+
+    (
+        cd "$SOURCE"
+        make olddefconfig
+        make -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)" bzImage modules
+        make modules_install INSTALL_MOD_PATH="$MODULES_OUTPUT"
+    )
+
+    [ -s "$SOURCE/arch/x86/boot/bzImage" ] || die "kernel build did not produce bzImage"
+    [ -d "$MODULES_OUTPUT/lib/modules" ] || die "kernel modules were not installed"
+
+    mkdir -p "$(dirname "$OUTPUT")"
+    install -m 0644 "$SOURCE/arch/x86/boot/bzImage" "$OUTPUT"
+
+    echo "kernel: $OUTPUT"
+    echo "modules: $MODULES_OUTPUT/lib/modules"
+    echo "firmware: $FIRMWARE_OUTPUT/lib/firmware"
+}
+
+case "$KERNEL_PROVIDER" in
+    alpine)
+        build_alpine
+        ;;
+    source)
+        build_source
+        ;;
+    *)
+        die "unsupported KERNEL_PROVIDER: $KERNEL_PROVIDER (use alpine or source)"
+        ;;
+esac

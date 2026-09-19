@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+MARKER="$HOME/.config/obsidian-core/.first-login"
+STAMP="$HOME/.config/obsidian-core"
+
+[ -f "$MARKER" ] || exit 0
+mkdir -p "$STAMP"
+rm -f "$MARKER"
+
+if command -v gnome-tour >/dev/null 2>&1; then
+    exec gnome-tour
+fi
+
+if command -v gnome-control-center >/dev/null 2>&1; then
+    exec gnome-control-center
+fi
+
+exit 0

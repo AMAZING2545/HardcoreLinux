@@ -1,0 +1,51 @@
+#!/usr/bin/expect -f
+set timeout 60
+
+set iso [lindex $argv 0]
+set ovmf [lindex $argv 1]
+set disk [lindex $argv 2]
+
+spawn qemu-system-x86_64 \
+    -machine q35 \
+    -m 1536 \
+    -smp 2 \
+    -cpu max \
+    -drive if=pflash,format=raw,readonly=on,file=$ovmf \
+    -drive file=$disk,format=raw,if=ide \
+    -cdrom $iso \
+    -boot d \
+    -no-reboot \
+    -serial stdio \
+    -display none
+
+expect "Obsidian Core Linux installer"
+expect "Installation mode (guided/manual) [guided]:"
+send "guided\r"
+expect "Target disk, e.g. /dev/sda:"
+send "/dev/sda\r"
+expect "Type ERASE /dev/sda exactly to continue:"
+send "ERASE /dev/sda\r"
+expect "Path to live root tree or rootfs.tar [/run/iso/live]:"
+send "/run/iso/live\r"
+expect "Path to kernel image [/run/iso/boot/vmlinuz]:"
+send "/run/iso/boot/vmlinuz\r"
+expect "Hostname [obsidian]:"
+send "obsidian\r"
+expect "Username [user]:"
+send "test\r"
+expect "yspm repository URL"
+send "https://example.invalid/index.json\r"
+expect "Set user password:"
+expect "New password:"
+send "test123\r"
+expect "Retype password:"
+send "test123\r"
+expect "Set root password:"
+expect "New password:"
+send "root123\r"
+expect "Retype password:"
+send "root123\r"
+expect "Installation completed."
+set qemu_pid [exp_pid]
+exec kill -TERM $qemu_pid
+expect eof

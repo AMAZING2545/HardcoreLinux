@@ -1,18 +1,8 @@
-
-
 #!/bin/sh
+set -eu
 
-wd=$(pwd)
-cd $dir
-rm -rf /tmp/stage
-rm -rf build
-mkdir build && cd build
-meson setup .. --reconfigure -Dtests=false -Dprefix=/usr
-ninja
-meson install --destdir=/tmp/stage
-mkdir -p /tmp/stage/etc/installer/wayland-protocols
-find /tmp/stage -name *.so -exec strip --strip-all {} \;
-echo 'wayland-protocols 1.41' > /tmp/stage/etc/installer/wayland-protocols/pkinfo
-cd $wd
-./flashpack /tmp/stage
-mv /tmp/stage/*.tar .
+: "${dir:?set dir to the extracted wayland-protocols source tree}"
+: "${YSPM_BIN:=yspm}"
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-wayland-protocols-1.45-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "wayland-protocols" "1.45" "Wayland protocol extensions"

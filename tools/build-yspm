@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+
+YSPM_REPO="${YSPM_SOURCE_REPO:-https://github.com/Yassine-Jemi01/yspm.git}"
+YSPM_REF="${YSPM_REF:-824b39de2758f5434889b7814888cad2f6a4f16a}"
+YSPM_SOURCE_DIR="${YSPM_SOURCE_DIR:-/tmp/yspm-source}"
+YSPM_OUTPUT="${YSPM_OUTPUT:-/tmp/yspm}"
+
+command -v git >/dev/null 2>&1 || { echo "build-yspm: git is required" >&2; exit 1; }
+command -v go >/dev/null 2>&1 || { echo "build-yspm: Go 1.23+ is required" >&2; exit 1; }
+
+if [ ! -d "$YSPM_SOURCE_DIR/.git" ]; then
+    rm -rf "$YSPM_SOURCE_DIR"
+    git clone --depth 1 "$YSPM_REPO" "$YSPM_SOURCE_DIR"
+fi
+
+git -C "$YSPM_SOURCE_DIR" fetch --depth 1 origin "$YSPM_REF" >/dev/null 2>&1 || true
+git -C "$YSPM_SOURCE_DIR" checkout --force "$YSPM_REF"
+
+mkdir -p "${YSPM_OUTPUT%/*}"
+(
+    cd "$YSPM_SOURCE_DIR"
+    CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$YSPM_OUTPUT" ./cmd/yspm
+)
+
+chmod 0755 "$YSPM_OUTPUT"
+printf '%s\n' "$YSPM_OUTPUT"

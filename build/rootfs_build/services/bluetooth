@@ -1,0 +1,8 @@
+#!/bin/sh
+for daemon in /usr/lib/bluetooth/bluetoothd /usr/libexec/bluetooth/bluetoothd /usr/sbin/bluetoothd; do
+    if [ -x "$daemon" ]; then
+        exec "$daemon"
+    fi
+done
+echo "bluetooth: daemon not found" >&2
+exit 1

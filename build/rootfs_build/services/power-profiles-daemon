@@ -1,0 +1,6 @@
+#!/bin/sh
+for daemon in /usr/libexec/power-profiles-daemon /usr/lib/power-profiles-daemon; do
+    if [ -x "$daemon" ]; then exec "$daemon"; fi
+done
+echo "power-profiles-daemon: daemon not found" >&2
+exit 1

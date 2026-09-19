@@ -1,17 +1,8 @@
-
-
 #!/bin/sh
+set -eu
 
-wd=$(pwd)
-cd $dir
-rm -rf /tmp/stage
-./configure --prefix=/usr --enable-static=no
-make -j$(nproc)
-make DESTDIR=/tmp/stage install
-mkdir -p /tmp/stage/etc/installer/libffi
-find /tmp/stage -name *.so -exec strip --strip-all {} \;
-find /tmp/stage -name *.la -exec rm {} \;
-echo 'libffi 3.7.1 musl' > /tmp/stage/etc/installer/libffi/pkinfo
-cd $wd
-./flashpack /tmp/stage
-mv /tmp/stage/*.tar .
+: "${dir:?set dir to the extracted libffi source tree}"
+: "${YSPM_BIN:=yspm}"
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-libffi-3.4.8-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "libffi" "3.4.8" "Foreign function interface library"

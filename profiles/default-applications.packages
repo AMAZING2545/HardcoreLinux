@@ -1,0 +1,27 @@
+# Obsidian Core Linux common desktop applications
+
+# Web
+firefox
+
+# Documents and files
+libreoffice
+file-roller
+nautilus
+
+# Media
+mpv
+
+# Hardware and utilities
+gnome-disk-utility
+gnome-system-monitor
+pavucontrol
+gparted
+simple-scan
+
+# CLI essentials
+curl
+wget
+git
+nano
+vim
+htop
