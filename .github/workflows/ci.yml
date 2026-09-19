@@ -168,8 +168,128 @@ jobs:
           test -s iso-root/boot/grub/grub.cfg
 
           INITRAMFS_CONTENT="$(gzip -dc iso-root/boot/initramfs.img | cpio -t 2>/dev/null)"
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -qx './etc/hc-live'
-          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -qx './usr/sbin/hc-installer'
+          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)etc/hc-live
+          xorriso -indev "$ISO" -report_el_torito plain
+
+          sha256sum "$ISO" | tee "$ISO.sha256"
+
+      - name: Boot ISO in QEMU
+        run: |
+          set +e
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE" || {
+            echo "OVMF firmware not found"
+            exit 1
+          }
+
+          timeout --kill-after=5s 35s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cpu max \
+            -bios "$OVMF_CODE" \
+            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
+            -boot d \
+            -no-reboot \
+            -no-shutdown \
+            -display none \
+            -serial stdio \
+            > qemu.log 2>&1
+          RC=$?
+          set -e
+
+          cat qemu.log
+
+          if [ "$RC" -ne 124 ]; then
+            echo "QEMU exited unexpectedly with status $RC"
+            exit 1
+          fi
+
+          grep -q "Obsidian Core Linux installer" qemu.log || {
+            echo "Live installer did not appear on the serial console"
+            exit 1
+          }
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload QEMU log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 14
+
+
+          printf '%s\\n' "$INITRAMFS_CONTENT" | grep -Eq '(^|/)usr/sbin/hc-installer
+          xorriso -indev "$ISO" -report_el_torito plain
+
+          sha256sum "$ISO" | tee "$ISO.sha256"
+
+      - name: Boot ISO in QEMU
+        run: |
+          set +e
+          OVMF_CODE="$(find /usr/share -type f \( -name 'OVMF_CODE_4M.fd' -o -name 'OVMF_CODE.fd' \) | head -n 1)"
+          test -n "$OVMF_CODE" || {
+            echo "OVMF firmware not found"
+            exit 1
+          }
+
+          timeout --kill-after=5s 35s qemu-system-x86_64 \
+            -machine q35 \
+            -m 1024 \
+            -smp 2 \
+            -cpu max \
+            -bios "$OVMF_CODE" \
+            -cdrom "ObsidianCoreLinux-${{ github.sha }}.iso" \
+            -boot d \
+            -no-reboot \
+            -no-shutdown \
+            -display none \
+            -serial stdio \
+            > qemu.log 2>&1
+          RC=$?
+          set -e
+
+          cat qemu.log
+
+          if [ "$RC" -ne 124 ]; then
+            echo "QEMU exited unexpectedly with status $RC"
+            exit 1
+          fi
+
+          grep -q "Obsidian Core Linux installer" qemu.log || {
+            echo "Live installer did not appear on the serial console"
+            exit 1
+          }
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-iso-${{ github.sha }}
+          path: |
+            ObsidianCoreLinux-${{ github.sha }}.iso
+            ObsidianCoreLinux-${{ github.sha }}.iso.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload QEMU log
+        uses: actions/upload-artifact@v4
+        with:
+          name: obsidian-core-linux-qemu-log-${{ github.sha }}
+          path: qemu.log
+          if-no-files-found: error
+          retention-days: 14
+
+
 
           xorriso -indev "$ISO" -report_el_torito plain
 
