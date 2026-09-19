@@ -15,34 +15,47 @@ ROOTFS=$1
 KERNEL=$2
 OUTPUT=$3
 
-for cmd in tar cpio gzip grub-mkrescue mktemp find; do
+for cmd in tar cpio gzip grub-mkrescue mktemp find cp mkdir chmod; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "build-iso: missing command: $cmd" >&2
         exit 1
     }
 done
 
-[ -f "$ROOTFS" ] || { echo "missing rootfs: $ROOTFS" >&2; exit 1; }
-[ -f "$KERNEL" ] || { echo "missing kernel: $KERNEL" >&2; exit 1; }
+[ -f "$ROOTFS" ] || {
+    echo "missing rootfs: $ROOTFS" >&2
+    exit 1
+}
+[ -f "$KERNEL" ] || {
+    echo "missing kernel: $KERNEL" >&2
+    exit 1
+}
+
+mkdir -p "$(dirname "$OUTPUT")"
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
 mkdir -p "$WORK/live/boot" "$WORK/iso/boot/grub"
+
 tar -xpf "$ROOTFS" -C "$WORK/live"
 cp "$KERNEL" "$WORK/live/boot/vmlinuz"
 cp "$ROOTFS" "$WORK/live/rootfs.tar"
 
 cat > "$WORK/live/init" <<'EOF'
 #!/bin/sh
-set -eu
+set -u
 
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sys /sys 2>/dev/null || true
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
+
 mkdir -p /dev/pts /dev/mqueue /run /tmp
 mount -t devpts devpts /dev/pts 2>/dev/null || true
 mount -t mqueue mqueue /dev/mqueue 2>/dev/null || true
+mount -t tmpfs tmpfs /run 2>/dev/null || true
+mount -t tmpfs tmpfs /tmp 2>/dev/null || true
+chmod 1777 /tmp 2>/dev/null || true
 
 exec /etc/init
 EOF
@@ -59,16 +72,22 @@ cat > "$WORK/iso/boot/grub/grub.cfg" <<'EOF'
 set timeout=4
 set default=0
 
-menuentry 'Obsidian Core Linux' {
-    linux /boot/vmlinuz rdinit=/init
+menuentry 'Obsidian Core Linux (Live Installer)' {
+    linux /boot/vmlinuz rdinit=/init console=tty0 console=ttyS0,115200n8
     initrd /boot/initramfs.img
 }
 
-menuentry 'Obsidian Core Linux (installer)' {
-    linux /boot/vmlinuz rdinit=/init
+menuentry 'Obsidian Core Linux (Recovery)' {
+    linux /boot/vmlinuz rdinit=/init console=tty0 console=ttyS0,115200n8 obsidian.recovery=1
     initrd /boot/initramfs.img
 }
 EOF
 
-grub-mkrescue -o "$OUTPUT" "$WORK/iso"
+grub-mkrescue -o "$OUTPUT" -volid OBSIDIANCORE "$WORK/iso"
+
+[ -s "$OUTPUT" ] || {
+    echo "build-iso: grub-mkrescue did not create a non-empty ISO" >&2
+    exit 1
+}
+
 echo "$OUTPUT"
