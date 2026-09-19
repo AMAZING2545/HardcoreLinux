@@ -45,7 +45,7 @@ jobs:
       - name: Build root filesystem
         env:
           YSPM_BIN: /tmp/yspm
-          YSPM_REPOSITORY_URL: https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json
+          YSPM_REPOSITORY_URL: https://github.com/${{ github.repository }}/releases/latest/download/repo-index.json
           YSPM_ARCHIVE_DIR: ${{ github.workspace }}/repo
           ROOTFS: /tmp/rootfs
           OUTPUT: /tmp/rootfs.tar
