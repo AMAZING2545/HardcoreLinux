@@ -156,8 +156,14 @@ jobs:
 
       - name: Verify ISO structure
         run: |
-          test -s "ObsidianCoreLinux-${{ github.sha }}.iso"
-          xorriso -indev "ObsidianCoreLinux-${{ github.sha }}.iso" -find /boot -type f -print
+          ISO="ObsidianCoreLinux-${{ github.sha }}.iso"
+          test -s "$ISO"
+
+          BOOT_FILES="$(xorriso -indev "$ISO" -find /boot -type f)"
+          printf '%s\\n' "$BOOT_FILES"
+
+          printf '%s\\n' "$BOOT_FILES" | grep -qx '/boot/vmlinuz'
+          printf '%s\\n' "$BOOT_FILES" | grep -qx '/boot/initramfs.img'
 
       - name: Boot ISO in QEMU
         run: |
