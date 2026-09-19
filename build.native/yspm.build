@@ -16,6 +16,7 @@ command -v go >/dev/null 2>&1 || {
     exit 1
 }
 
+mkdir -p "$STAGE/usr/bin"
 cd "$dir"
 CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$STAGE/usr/bin/yspm" ./cmd/yspm
 
