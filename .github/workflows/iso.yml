@@ -35,6 +35,8 @@ jobs:
             gzip \
             grub-efi-amd64-bin \
             grub2-common \
+            grub-pc-bin \
+            mtools \
             ovmf \
             qemu-system-x86 \
             xorriso
