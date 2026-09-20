@@ -97,7 +97,7 @@ jobs:
         run: |
           set -eux
           mv iso-tree/live/filesystem.erofs iso-tree/live/filesystem.erofs.orig
-          mkfs.erofs -b 4096 -z lzma -E ztailpacking             iso-tree/live/filesystem.erofs work/rootfs
+          sudo mkfs.erofs -b 4096 -z lzma -E ztailpacking             iso-tree/live/filesystem.erofs work/rootfs
           test -s iso-tree/live/filesystem.erofs
           rm -f iso-tree/live/filesystem.erofs.orig
           sudo rm -rf work/rootfs work/source-rootfs
