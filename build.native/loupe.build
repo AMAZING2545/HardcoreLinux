@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted loupe source tree}"
+: "${YSPM_BIN:=yspm}"
+
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-loupe-48.1-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson"  "$dir" "$OUT" "loupe" "48.1" "GNOME image viewer"

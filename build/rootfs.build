@@ -1,140 +1,151 @@
 #!/bin/sh
+set -eu
 
-#
-#			UNCOMMENT THE LINES THAT START WITH DIR= IF YOU WANT TO BUILD FROM SOURCE
-#
-#
+[ "$(id -u)" = 0 ] || {
+    echo "rootfs.build: must run as root" >&2
+    exit 1
+}
 
-if [ "$(whoami)" != "root" ]; then echo must be root; exit; fi
-rm -r $ROOTFS
-rm rootfs.tar
-mkdir -p $ROOTFS
-wd=$(pwd)
-#./musl.build
-cd $wd
-tar -xpzf devmusl.tar -C $ROOTFS
-tar -xpzf musl.tar -C $ROOTFS
-tar -xpzf devlinux.tar -C $ROOTFS
-tar -xpzf terminfo.tar -C $ROOTFS
+BUILD_DIR=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+REPO_DIR=$(CDPATH= cd -- "$BUILD_DIR/.." && pwd)
+ARCHIVE_DIR="${YSPM_ARCHIVE_DIR:-$REPO_DIR/repo}"
+ROOTFS="${ROOTFS:-$BUILD_DIR/rootfs}"
+OUTPUT="${OUTPUT:-$BUILD_DIR/rootfs.tar}"
+DISTRO_VERSION="${DISTRO_VERSION:-0.3.0}"
 
-echo compiling openssl
-sleep 1
+extract_if_present() {
+    archive="$1"
+    source="$ARCHIVE_DIR/$archive"
+    if [ -f "$source" ]; then
+        echo "extracting $source"
+        tar -xpzf "$source" -C "$ROOTFS"
+    else
+        echo "skipping missing archive: $source"
+    fi
+}
 
-#dir=./openssl-3.5.7 ROOTFS=$ROOTFS ./openssl.build
-tar -xpzf openssl.tar -C $ROOTFS
-#tar -xpzf devopenssl.tar -C $ROOTFS
+rm -rf "$ROOTFS"
+rm -f "$OUTPUT"
+mkdir -p "$ROOTFS"
 
-echo compiling busybox
-sleep 1
+for archive in \
+    devmusl.tar musl.tar devlinux.tar terminfo.tar openssl.tar busybox.tar \
+    ncurses6.tar zlib.tar devncurses6.tar libalsa.tar alsautils.tar \
+    libunwind.tar devlibunwind.tar htop.tar nano.tar popt.tar \
+    deve2fsprogs.tar e2fsprogs.tar gfdisk.tar libgcc.tar libstdc++.tar; do
+    extract_if_present "$archive"
+done
 
-#dir=busybox-1.38.0 cfg=busybox.config ROOTFS=$ROOTFS ./busybox.build
-tar -xpzf busybox.tar -C $ROOTFS
+if [ -d "$BUILD_DIR/udhcpc" ]; then
+    mkdir -p "$ROOTFS/usr/share"
+    cp -a "$BUILD_DIR/udhcpc" "$ROOTFS/usr/share/"
+fi
 
-echo compiling ncurses
-sleep 1
+mkdir -p "$ROOTFS/etc" "$ROOTFS/usr/bin" "$ROOTFS/usr/sbin" "$ROOTFS/sbin"
+mkdir -p "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"
+mkdir -p "$ROOTFS/system/tmp" "$ROOTFS/var/lib/yspm" "$ROOTFS/var/cache/yspm"
+mkdir -p "$ROOTFS/etc/yspm" "$ROOTFS/etc/profile.d" "$ROOTFS/run/user"
+mkdir -p "$ROOTFS/usr/share/obsidian-core-linux/profiles"
 
-#dir=./ncurses-6.6 ROOTFS=$ROOTFS ./ncurses.build
+cp "$BUILD_DIR/rootfs_build/init" "$ROOTFS/etc/init"
+cp "$BUILD_DIR/rootfs_build/initctl" "$ROOTFS/sbin/initctl"
+cp -a "$BUILD_DIR/rootfs_build/scripts/." "$ROOTFS/system/scripts/"
+if [ -d "$BUILD_DIR/rootfs_build/services" ]; then
+    cp -a "$BUILD_DIR/rootfs_build/services/." "$ROOTFS/system/services/"
+fi
+if [ -d "$BUILD_DIR/rootfs_build/drivers" ]; then
+    cp -a "$BUILD_DIR/rootfs_build/drivers/." "$ROOTFS/system/drivers/"
+fi
+cp "$REPO_DIR/profiles/gnome.packages" "$ROOTFS/usr/share/obsidian-core-linux/profiles/gnome.packages"
+cp "$REPO_DIR/profiles/minimal-desktop.packages" "$ROOTFS/usr/share/obsidian-core-linux/profiles/minimal-desktop.packages"
+chmod 0755 "$ROOTFS/etc/init" "$ROOTFS/sbin/initctl"
+for tree in "$ROOTFS/system/services" "$ROOTFS/system/scripts" "$ROOTFS/system/drivers"; do
+    if [ -d "$tree" ]; then
+        find "$tree" -type f -print | while IFS= read -r file; do
+            chmod 0755 "$file"
+        done
+    fi
+done
+printf '%s\n' 'udev
+dbus
+elogind
+polkit
+NetworkManager' > "$ROOTFS/system/enabled-services"
+: > "$ROOTFS/system/tmp/services"
 
-echo compiling zlib
-sleep 1
+if [ -n "${YSPM_BIN:-}" ]; then
+    test -f "$YSPM_BIN" || {
+        echo "rootfs.build: YSPM_BIN does not exist: $YSPM_BIN" >&2
+        exit 1
+    }
+    cp "$YSPM_BIN" "$ROOTFS/usr/bin/yspm"
+else
+    YSPM_OUTPUT="/tmp/yspm" \
+    YSPM_REF="${YSPM_REF:-824b39de2758f5434889b7814888cad2f6a4f16a}" \
+    sh "$REPO_DIR/tools/build-yspm" >/dev/null
+    cp /tmp/yspm "$ROOTFS/usr/bin/yspm"
+fi
+chmod 0755 "$ROOTFS/usr/bin/yspm"
 
-#dir=./zlib-1.3.2 ROOTFS=$ROOTFS ./zlib.build
+cp "$REPO_DIR/tools/hc-installer" "$ROOTFS/usr/sbin/hc-installer"
+cp "$REPO_DIR/tools/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-desktop"
+cp "$REPO_DIR/tools/hc-setup-gnome" "$ROOTFS/usr/sbin/hc-setup-gnome"
+cp "$REPO_DIR/tools/hc-doctor" "$ROOTFS/usr/bin/hc-doctor"
+cp "$REPO_DIR/tools/hc-recovery" "$ROOTFS/usr/bin/hc-recovery"
+cp "$REPO_DIR/tools/obsidian-first-login" "$ROOTFS/usr/bin/obsidian-first-login"
+cp "$REPO_DIR/tools/bench-system" "$ROOTFS/usr/bin/hc-bench"
+chmod 0755 "$ROOTFS/usr/sbin/hc-installer" "$ROOTFS/usr/sbin/hc-setup-desktop" "$ROOTFS/usr/sbin/hc-setup-gnome" "$ROOTFS/usr/bin/hc-doctor" "$ROOTFS/usr/bin/hc-recovery" "$ROOTFS/usr/bin/obsidian-first-login" "$ROOTFS/usr/bin/hc-bench"
 
-tar -xpzf ncurses6.tar -C $ROOTFS
-tar -xpzf zlib.tar -C $ROOTFS
-tar -xpzf devncurses6.tar -C $ROOTFS
+mkdir -p "$ROOTFS/etc/ssl/certs"
+if command -v wget >/dev/null 2>&1; then
+    wget -q https://curl.se/ca/cacert.pem -O "$ROOTFS/etc/ssl/certs/ca-certificates.crt" || true
+fi
 
-echo compiling unwind
-sleep 1
+mkdir -p "$ROOTFS/home" "$ROOTFS/root" "$ROOTFS/tmp"
+mkdir -p "$ROOTFS/etc/xdg/autostart"
+cp "$REPO_DIR/build/rootfs_build/xdg/autostart/obsidian-first-login.desktop" "$ROOTFS/etc/xdg/autostart/obsidian-first-login.desktop"
+cp "$REPO_DIR/build/rootfs_build/etc/chrony.conf" "$ROOTFS/etc/chrony.conf"
+cp "$REPO_DIR/build/rootfs_build/etc/nftables.conf" "$ROOTFS/etc/nftables.conf"
+printf '%s\n' 'root:x:0:0:root:/root:/bin/sh' > "$ROOTFS/etc/passwd"
+printf '%s\n' 'root:x:0:' > "$ROOTFS/etc/group"
+printf '%s\n' 'root:!:1:0:99999:7:::' > "$ROOTFS/etc/shadow"
+chmod 0644 "$ROOTFS/etc/passwd" "$ROOTFS/etc/group"
+chmod 0600 "$ROOTFS/etc/shadow"
 
-#dir=libunwind ROOTFS=$ROOTFS ./libunwind.build
+printf '%s\n' 'nameserver 1.1.1.1' > "$ROOTFS/etc/resolv.conf"
 
-echo compiling libALSA
-sleep 1
+cat > "$ROOTFS/etc/profile" <<'EOF'
+export LD_LIBRARY_PATH="/usr/lib:/lib"
+export PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+export SSL_CERT_FILE="/etc/ssl/certs/ca-certificates.crt"
+[ -f /etc/yspm/env ] && . /etc/yspm/env
+[ -f /etc/profile.d/20-desktop.sh ] && . /etc/profile.d/20-desktop.sh
+EOF
 
-#dir=./alsa-lib-1.2.16.1 ROOTFS=$ROOTFS ./libalsa.build
-tar -xpzf libalsa.tar -C $ROOTFS
+cat > "$ROOTFS/etc/profile.d/yspm.sh" <<'EOF'
+[ -f /etc/yspm/env ] && . /etc/yspm/env
+EOF
 
-echo compiling ALSAutils
-sleep 1
+YSPM_REPOSITORY_URL="${YSPM_REPOSITORY_URL:-https://github.com/Yassine-Jemi01/HardcoreLinux/releases/latest/download/repo-index.json}"
+cat > "$ROOTFS/etc/yspm/env" <<EOF
+export YSPM_REPOSITORY='$YSPM_REPOSITORY_URL'
+export YSPM_ROOT='/'
+export YSPM_DATA_DIR='/var/lib/yspm'
+export YSPM_CACHE_DIR='/var/cache/yspm'
+EOF
 
-#dir=./alsa-utils-1.2.9 ROOTFS=$ROOTFS ./alsautils.build
-tar -xpzf alsautils.tar -C $ROOTFS
-tar -xpzf libunwind.tar -C $ROOTFS
-tar -xpzf devlibunwind.tar -C $ROOTFS
-#dir=./htop ROOTFS=$ROOTFS ./htop.build
-tar -xpzf htop.tar -C $ROOTFS
-#dir=./nano-9.1 ROOTFS=$ROOTFS ./nano.build
-tar -xpzf nano.tar -C $ROOTFS
-tar -xpzf popt.tar -C $ROOTFS
-tar -xpzf deve2fsprogs.tar -C $ROOTFS
-tar -xpzf e2fsprogs.tar -C $ROOTFS
-tar -xpzf gfdisk.tar -C $ROOTFS
-tar -xpzf libgcc.tar -C $ROOTFS
-tar -xpzf libstdc++.tar -C $ROOTFS
-cp -a udhcpc $ROOTFS/usr/share
-
-
-cp rootfs_build/flashman $ROOTFS/sbin
-chown 0:0 $ROOTFS/sbin/flashman
-
-cp rootfs_build/init $ROOTFS/etc/init
-chown 0:0 $ROOTFS/etc/init
-chmod 744 $ROOTFS/etc/init
-
-cp -r rootfs_build/services $ROOTFS/system
-cp -r rootfs_build/scripts $ROOTFS/system
-cp -r rootfs_build/drivers $ROOTFS/system
-chmod 744 -R $ROOTFS/system
-tar -xpzf rootfs_build/drivers.tar -C $ROOTFS/lib
-tar -xpzf my_modules.tar -C $ROOTFS
-
-#installing certificates
-wget https://curl.se/ca/cacert.pem -O $ROOTFS/etc/ssl/certs/ca-certificates.crt
-
-#rm $ROOTFS/bin/sh $ROOTFS/bin/ash
-#printf '%s' '#!/bin/busybox ash
-#$(cat /etc/profile)
-#exec /bin/busybox ash $@' > $ROOTFS/bin/ash
-#ln $ROOTFS/bin/ash $ROOTFS/bin/sh
-#chmod 755 $ROOTFS/bin/ash
-
-printf '%s' '#!/bin/sh
-mkdir -p /bin /sbin /etc /proc /sys /dev /usr/bin /usr/include /usr/lib /lib /system/services /system/scripts /system/drivers /system/tmp /system/esp /var /run /mnt /home/test /root /tmp/system
-
-touch /etc/passwd 
-touch /etc/group
-
-echo -e "Hardcore\nHardcore" | adduser -h /home/test -s /bin/sh -u 1000 test
-echo -e "Hardcore\nHardcore" | adduser -h /root -s /bin/sh -u 0 root
-addgroup -g 10 -S audio
-addgroup root audio
-addgroup test audio
-
-echo -ne "nameserver 192.168.1.1\nnameserver 1.1.1.1" > /etc/resolv.conf
-echo -ne "export LD_LIBRARY_PATH="/usr/lib:/lib"\nexport PATH="/bin:/sbin:/usr/bin:/usr/sbin"\nexport SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt" > /etc/profile
-echo -n "passwd: files
-group: files
-shadow: files
-hosts: files dns
-networks: files
-protocols: files
-services: files
-ethers: files
-rpc: files" > /etc/nsswitch.conf
-
-
-echo -n "NAME="HardCore Linux"
-VERSION="1.2.0"
-ID=hardcore linux
-ID_LIKE=HardCore
-PRETTY_NAME="HardCore Linux v1.3.0"
+cat > "$ROOTFS/etc/os-release" <<EOF
+NAME="Obsidian Core Linux"
+VERSION="$DISTRO_VERSION"
+ID=obsidiancore
+ID_LIKE=alpine
+PRETTY_NAME="Obsidian Core Linux $DISTRO_VERSION"
 ANSI_COLOR="36"
-HOME_URL="https://github.com/amazing2545/hardcorelinux"
-BUG_REPORT_URL=""" > /etc/os-release
+HOME_URL="https://github.com/Yassine-Jemi01/ObsidianCoreLinux"
+BUG_REPORT_URL="https://github.com/Yassine-Jemi01/ObsidianCoreLinux/issues"
+EOF
 
-chmod 755 /
-' | chroot $ROOTFS /bin/sh
-cp rootfs_build/initctl $ROOTFS/sbin
-(cd $ROOTFS; tar cpz $(ls)) > rootfs.tar
-echo rootfs.tar is ready
+: > "$ROOTFS/etc/hc-live"
+
+tar -cpzf "$OUTPUT" -C "$ROOTFS" .
+echo "root filesystem: $OUTPUT"

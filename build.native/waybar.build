@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted Waybar source tree}"
+: "${YSPM_BIN:=yspm}"
+
+VERSION="${VERSION:-git}"
+ARCH="${ARCH:-x86_64}"
+ABI="${YSPM_ABI:-yspm-abi-1}"
+OUT="${OUTPUT:-waybar-${VERSION}-${ARCH}.yspkg}"
+STAGE=$(mktemp -d)
+trap 'rm -rf "$STAGE"' EXIT
+
+cd "$dir"
+rm -rf build
+meson setup build --prefix=/usr -Dtests=disabled
+ninja -C build
+DESTDIR="$STAGE" meson install -C build
+
+"$YSPM_BIN" build \
+  --root "$STAGE" \
+  --output "$OUT" \
+  --name waybar \
+  --version "$VERSION" \
+  --description "Highly customizable Wayland status bar" \
+  --abi "$ABI" \
+  --arch "$ARCH" \
+  --license MIT
+echo "$OUT"

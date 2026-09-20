@@ -1,0 +1,6 @@
+#!/bin/sh
+for daemon in /usr/sbin/chronyd /usr/bin/chronyd; do
+    if [ -x "$daemon" ]; then exec "$daemon" -f /etc/chrony.conf; fi
+done
+echo "chronyd: daemon not found" >&2
+exit 1

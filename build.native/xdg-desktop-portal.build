@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted xdg-desktop-portal source tree}"
+: "${YSPM_BIN:=yspm}"
+
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-xdg-desktop-portal-1.20.1-${ARCH:-x86_64}.yspkg}"
+
+sh "$REPO_ROOT/tools/build-native-meson" "$dir" "$OUT" "xdg-desktop-portal" "1.20.1" "Desktop portal service"

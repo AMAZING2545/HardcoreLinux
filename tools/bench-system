@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+printf '%s\n' 'Hardcore Linux benchmark snapshot'
+printf '%s\n' '================================'
+printf 'Kernel: '
+uname -srmo
+
+printf 'Arch: '
+uname -m
+
+printf 'Uptime: '
+awk '{printf "%.3f seconds\n", $1}' /proc/uptime
+
+printf '%s\n' 'Memory:'
+awk '
+/^MemTotal:/ { total=$2 }
+/^MemAvailable:/ { avail=$2 }
+/^MemFree:/ { free=$2 }
+END {
+    printf "  total:     %.1f MiB\n", total/1024
+    printf "  available: %.1f MiB\n", avail/1024
+    printf "  free:      %.1f MiB\n", free/1024
+}' /proc/meminfo
+
+printf '%s\n' 'Root filesystem:'
+df -h /
+
+printf '%s\n' 'Processes:'
+ps | wc -l | awk '{print "  count: " $1}'

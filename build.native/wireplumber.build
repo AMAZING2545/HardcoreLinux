@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted WirePlumber source tree}"
+: "${YSPM_BIN:=yspm}"
+
+VERSION="${VERSION:-git}"
+ARCH="${ARCH:-x86_64}"
+ABI="${YSPM_ABI:-yspm-abi-1}"
+OUT="${OUTPUT:-wireplumber-${VERSION}-${ARCH}.yspkg}"
+STAGE=$(mktemp -d)
+trap 'rm -rf "$STAGE"' EXIT
+
+cd "$dir"
+rm -rf build
+meson setup build --prefix=/usr -Ddoc=disabled -Dtests=disabled
+ninja -C build
+DESTDIR="$STAGE" meson install -C build
+
+"$YSPM_BIN" build \
+  --root "$STAGE" \
+  --output "$OUT" \
+  --name wireplumber \
+  --version "$VERSION" \
+  --description "PipeWire session and policy manager" \
+  --abi "$ABI" \
+  --arch "$ARCH" \
+  --license MIT
+echo "$OUT"

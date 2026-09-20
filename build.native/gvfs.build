@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+: "${dir:?set dir to the extracted gvfs source tree}"
+: "${YSPM_BIN:=yspm}"
+
+REPO_ROOT="${REPO_ROOT:-.}"
+OUT="${OUTPUT:-gvfs-1.58.0-${ARCH:-x86_64}.yspkg}"
+sh "$REPO_ROOT/tools/build-native-meson"  "$dir" "$OUT" "gvfs" "1.58.0" "GNOME virtual filesystem backends"

@@ -1,0 +1,8 @@
+#!/bin/sh
+for daemon in /usr/lib/polkit-1/polkitd /usr/libexec/polkit-1/polkitd /usr/sbin/polkitd; do
+    if [ -x "$daemon" ]; then
+        exec "$daemon" --no-debug
+    fi
+done
+echo "polkit: daemon not found" >&2
+exit 1

@@ -1,39 +1,137 @@
-# HARDCORE LINUX, a lighweight independent linux rootfs and distro
+# Obsidian Core Linux
 
-### installation: see wiki, or download the .img directly if you're impatient
+Obsidian Core Linux is an independent Linux distribution project built around musl, BusyBox, a small native init/service layer, and yspm.
 
-### goals
-most linux distros nowadays can start at 2+ GB ISO, the most notable example being Ubuntu with a 6GB ISO for the full GUI variant
-or Omarchy (which does not even try to be minimal)
+## Project direction
 
-Some distros try, like Arch delivers a 700MB base rootfs; and some even harder, like Alpine, and some tried too hard, like  
-TinyCore (impressive for 17MB, but almost nothing works)
+Obsidian Core Linux aims to be a complete general-purpose desktop distribution rather than only a bootstrap environment.
 
-Hardcore tries to be minimal while not giving away functionality.
+The default desktop is GNOME. The system keeps a lightweight fallback profile for lower-resource machines.
 
-Hardcore, unlike many distros, uses musl libc instead glibc, which is lighter, safer and strictly POSIX
+The project uses:
 
-the init system is a shell script that launches scripts and services from /system. a shell script is more auditable than a binary
+- musl libc
+- BusyBox
+- a small auditable init and service layer
+- yspm as the only package manager
+- UEFI x86_64 boot support
+- GNOME as the default desktop
+- GDM as the preferred graphical login manager
+- PipeWire and WirePlumber
+- NetworkManager
+- Bluetooth support
+- a native .yspkg repository
 
-the package manager is also a script
+## Current development line
 
-in 700MB you can fit the base Hardcore system, GCC, G++, LLVM, MESA, Python, many dependencies for Wayland, Wayland itself, a 
-Compositor, A terminal emulator with many terminal apps
+The current development work covers:
 
-All of this with 110MB of idle memory usage at maximum (can go to 20/30MB, but free RAM is wasted RAM)
+- interactive installer
+- guided GPT or manual partitioning
+- root and user account creation
+- filesystem and bootloader setup
+- native yspm bootstrap
+- GNOME desktop profile
+- graphical login integration
+- audio, network, Bluetooth and desktop portal foundations
+- live ISO generation
+- UEFI disk image generation
+- native package build recipes
+- legacy package migration
+- repository indexes and checksums
+- CI validation and tagged releases
+- installation and troubleshooting documentation
 
-the repository only contains most software that you would need to compile your own(if you ever need rust, download it from there "https://static.rust-lang.org/dist/rust-1.97.1-x86_64-unknown-linux-musl.tar.xz")
+## yspm
 
-### does Hardcore have a desktop environment?
+yspm is the only package manager used by the distribution.
 
-yes and no
+Typical commands:
 
-while the base system lacks wayland altogether, it can be installed via the sway package, which will prompt to install a lot
-of dependencies
+~~~bash
+sudo yspm update
+sudo yspm search gnome
+sudo yspm install gnome-shell
+sudo yspm upgrade
+~~~
 
-you will also need udev for libinput to work. after installing udev you will need to create a script and launch udevd and udevadm
+The distribution does not maintain a second package manager.
 
-then you need to set the renderer to pixman and not opengl(which will crash because wlroots does not like llvmpipe)
+## Build
 
-### report bugs
-if you ever find a bug or request a feature, start a issue at https://github.com/AMAZING2545/HardcoreLinux/issues
+Build yspm:
+
+~~~bash
+sh tools/build-yspm
+~~~
+
+Build the root filesystem:
+
+~~~bash
+sudo env YSPM_BIN=/tmp/yspm YSPM_ARCHIVE_DIR="$PWD/repo" sh build/rootfs.build
+~~~
+
+Build a UEFI disk image:
+
+~~~bash
+sudo sh tools/extract-kernel repo/linux_UEFI_standalone.tar /tmp/vmlinuz
+sudo sh tools/build-image build/rootfs.tar /tmp/vmlinuz ObsidianCoreLinux.img 2G
+~~~
+
+Build a live ISO:
+
+~~~bash
+sudo sh tools/build-iso build/rootfs.tar /tmp/vmlinuz ObsidianCoreLinux.iso
+~~~
+
+## Installation
+
+Boot the live ISO in UEFI x86_64 mode.
+
+The live environment launches the interactive installer on tty1. It supports guided GPT partitioning or manual partitions, configures the first user, writes filesystem mounts, installs the bootloader, and removes the live-only marker from the installed system.
+
+See docs/INSTALL.md.
+
+## Desktop
+
+GNOME is the default desktop direction.
+
+The target desktop profile includes the GNOME shell, Mutter, session components, settings, control center, file manager, portals, storage integration, permissions, login manager, audio, networking and Bluetooth.
+
+See docs/GNOME.md.
+
+## Native repository
+
+Native system packages use the .yspkg format.
+
+The package format provides metadata, file ownership, SHA-256 verification, shared-library dependency information, configuration-file handling, lifecycle hooks, service integration, triggers and transaction state through yspm.
+
+## Security and integrity
+
+Release images and repository metadata receive SHA-256 checksums.
+
+Repository indexes can additionally use Ed25519 signatures supported by yspm.
+
+## CI/CD
+
+Pull requests and pushes validate shell syntax, ShellCheck and Python syntax.
+
+Version tags build:
+
+- a UEFI disk image
+- a live ISO
+- the native package repository
+- repository metadata
+- SHA-256 checksums
+
+## Development status
+
+The distribution is still under active development.
+
+The largest remaining milestone is populating and runtime-testing the complete native GNOME package stack on musl, followed by real ISO boot testing, hardware testing, installer hardening, recovery tooling, firmware coverage and release qualification.
+
+The project intentionally does not publish invented benchmark numbers or pretend that an untested component is production-ready.
+
+## License
+
+GNU General Public License v2.0.

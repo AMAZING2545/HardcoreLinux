@@ -1,0 +1,189 @@
+#!/bin/sh
+set -eu
+
+die() { printf 'installer: %s\n' "$*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+ask() {
+    prompt="$1"
+    default="${2:-}"
+    printf '%s' "$prompt"
+    [ -n "$default" ] && printf ' [%s]' "$default"
+    printf ': '
+    IFS= read -r answer || true
+    [ -n "$answer" ] || answer="$default"
+    printf '%s' "$answer"
+}
+yesno() {
+    prompt="$1"
+    default="${2:-n}"
+    while :; do
+        ans=$(ask "$prompt (y/n)" "$default")
+        case "$ans" in
+            y|Y|yes|YES) return 0 ;;
+            n|N|no|NO) return 1 ;;
+        esac
+        printf 'Please answer y or n.\n'
+    done
+}
+
+[ "$(id -u)" = 0 ] || die "run this installer as root"
+need tar
+need mount
+need umount
+need lsblk
+need blkid
+need chroot
+need mkfs.ext4
+
+printf '\033c'
+printf '%s\n' 'Obsidian Core Linux installer'
+printf '%s\n\n' 'This installer is intentionally small. Review every value before writing a disk.'
+printf '%s\n' 'Detected disks:'
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
+printf '\n'
+
+MODE=$(ask 'Installation mode (guided/manual)' 'guided')
+case "$MODE" in
+    guided)
+        need gdisk
+        need mkfs.vfat
+        DISK=$(ask 'Target disk, e.g. /dev/sda')
+        [ -b "$DISK" ] || die "not a block device: $DISK"
+        yesno "ERASE AND REPARTITION $DISK?" "n" || die "installation cancelled"
+        printf '%s\n' 'Writing a GPT layout: 512 MiB EFI + remaining space for Linux...'
+        printf 'o\ny\nn\n1\n\n+512M\nEF00\nn\n2\n\n\n8300\nw\ny\n' | gdisk "$DISK"
+        case "$DISK" in
+            *nvme*|*mmcblk*) ESP="${DISK}p1"; ROOT="${DISK}p2" ;;
+            *) ESP="${DISK}1"; ROOT="${DISK}2" ;;
+        esac
+        sleep 1
+        mkfs.vfat -F 32 "$ESP"
+        mkfs.ext4 -F "$ROOT"
+        ;;
+    manual)
+        ESP=$(ask 'EFI system partition')
+        ROOT=$(ask 'Linux root partition')
+        [ -b "$ESP" ] || die "not a block device: $ESP"
+        [ -b "$ROOT" ] || die "not a block device: $ROOT"
+        if yesno "Format the root partition as ext4?" "n"; then
+            mkfs.ext4 -F "$ROOT"
+        fi
+        ;;
+    *) die "unknown installation mode" ;;
+esac
+
+ROOTFS=$(ask 'Path to rootfs.tar' '/rootfs.tar')
+[ -f "$ROOTFS" ] || die "rootfs archive not found: $ROOTFS"
+KERNEL=$(ask 'Path to kernel image' '/boot/vmlinuz')
+[ -f "$KERNEL" ] || die "kernel image not found: $KERNEL"
+
+HOSTNAME=$(ask 'Hostname' 'hardcore')
+USERNAME=$(ask 'Username' 'user')
+YSPM_REPO=$(ask 'yspm repository URL' 'https://github.com/Yassine-Jemi01/ObsidianCoreLinux/releases/latest/download/repo-index.json')
+BOOTLOADER=$(ask 'Bootloader (grub/systemd-boot)' 'grub')
+
+case "$USERNAME" in
+    ''|*[!a-zA-Z0-9._-]*) die "invalid username: $USERNAME" ;;
+esac
+
+TARGET=/mnt/hardcore
+mkdir -p "$TARGET"
+mount "$ROOT" "$TARGET"
+trap 'umount "$TARGET/boot/efi" 2>/dev/null || true; umount "$TARGET" 2>/dev/null || true' EXIT INT TERM
+
+mkdir -p "$TARGET/boot/efi"
+mount "$ESP" "$TARGET/boot/efi"
+
+printf '%s\n' 'Installing root filesystem...'
+tar -xpf "$ROOTFS" -C "$TARGET"
+rm -f "$TARGET/etc/hc-live"
+
+mkdir -p "$TARGET/boot"
+cp "$KERNEL" "$TARGET/boot/vmlinuz"
+mkdir -p "$TARGET/etc/yspm" "$TARGET/etc/profile.d" "$TARGET/home"
+printf '%s\n' "$HOSTNAME" > "$TARGET/etc/hostname"
+
+cat > "$TARGET/etc/yspm/env" <<EOF
+export YSPM_REPOSITORY='$YSPM_REPO'
+export YSPM_ROOT='/'
+export YSPM_DATA_DIR='/var/lib/yspm'
+export YSPM_CACHE_DIR='/var/cache/yspm'
+EOF
+
+cat > "$TARGET/etc/profile.d/yspm.sh" <<'EOF'
+[ -f /etc/yspm/env ] && . /etc/yspm/env
+EOF
+chmod 0644 "$TARGET/etc/profile.d/yspm.sh"
+
+chroot "$TARGET" /bin/sh -c "adduser -D -h /home/$USERNAME -s /bin/sh '$USERNAME' 2>/dev/null || adduser -h /home/$USERNAME -s /bin/sh '$USERNAME'"
+chroot "$TARGET" /bin/sh -c "addgroup '$USERNAME' audio 2>/dev/null || true"
+printf '%s\n' 'Set user password:'
+chroot "$TARGET" passwd "$USERNAME"
+printf '%s\n' 'Set root password:'
+chroot "$TARGET" passwd root
+chroot "$TARGET" /bin/sh -c "mkdir -p /home/$USERNAME/.config/obsidian-core; touch /home/$USERNAME/.config/obsidian-core/.first-login; chown -R $USERNAME:$USERNAME /home/$USERNAME"
+
+ROOT_UUID=$(blkid -s UUID -o value "$ROOT")
+ESP_UUID=$(blkid -s UUID -o value "$ESP")
+[ -n "$ROOT_UUID" ] || die "could not read root filesystem UUID"
+[ -n "$ESP_UUID" ] || die "could not read EFI filesystem UUID"
+
+cat > "$TARGET/etc/fstab" <<EOF
+UUID=$ROOT_UUID / ext4 defaults,noatime 0 1
+UUID=$ESP_UUID /boot/efi vfat umask=0077 0 2
+EOF
+
+mkdir -p "$TARGET/etc/sudoers.d"
+cat > "$TARGET/etc/sudoers.d/10-wheel" <<'EOF'
+%wheel ALL=(ALL:ALL) ALL
+EOF
+chmod 0440 "$TARGET/etc/sudoers.d/10-wheel"
+
+cat > "$TARGET/etc/motd" <<'EOF'
+Obsidian Core Linux
+GNOME desktop setup:
+  sudo /usr/sbin/hc-setup-desktop
+
+Package management:
+  sudo yspm update
+  sudo yspm install <package>
+EOF
+
+case "$BOOTLOADER" in
+    grub)
+        need grub-install
+        grub-install --target=x86_64-efi --efi-directory="$TARGET/boot/efi" --bootloader-id=ObsidianCoreLinux --boot-directory="$TARGET/boot" --removable --recheck --no-nvram
+        mkdir -p "$TARGET/boot/grub"
+        cat > "$TARGET/boot/grub/grub.cfg" <<EOF
+search --no-floppy --fs-uuid --set=root $ROOT_UUID
+set timeout=3
+menuentry 'Obsidian Core Linux' {
+    linux /boot/vmlinuz root=UUID=$ROOT_UUID rw init=/etc/init
+}
+EOF
+        ;;
+    systemd-boot)
+        need bootctl
+        bootctl --path="$TARGET/boot/efi" install
+        mkdir -p "$TARGET/boot/efi/loader/entries"
+        cat > "$TARGET/boot/efi/loader/loader.conf" <<'EOF'
+default hardcore
+timeout 3
+editor no
+EOF
+        cat > "$TARGET/boot/efi/loader/entries/hardcore.conf" <<EOF
+title Obsidian Core Linux
+linux /boot/vmlinuz
+options root=UUID=$ROOT_UUID rw init=/etc/init
+EOF
+        ;;
+    *) die "unsupported bootloader: $BOOTLOADER" ;;
+esac
+
+sync
+printf '\n%s\n' 'Installation completed.'
+printf '%s\n' "Root: $ROOT"
+printf '%s\n' "User: $USERNAME"
+printf '%s\n' "Hostname: $HOSTNAME"
+printf '%s\n' "Bootloader: $BOOTLOADER"
+printf '%s\n' 'Reboot after the installer unmounts the target filesystem.'
