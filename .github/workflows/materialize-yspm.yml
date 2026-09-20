@@ -1,0 +1,68 @@
+name: Materialize yspm package
+
+on:
+  push:
+    branches:
+      - yspm-integration
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build yspm.tar
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/go /tmp/yspm-build stage
+          mkdir -p /tmp/go /tmp/yspm-build stage/usr/bin stage/etc/installer/yspm repo
+
+          curl -L --fail --silent --show-error             https://go.dev/dl/go1.27.1.linux-amd64.tar.gz             -o /tmp/go.tar.gz
+
+          echo "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445  /tmp/go.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/go.tar.gz -C /tmp/go --strip-components=1
+
+          git clone --depth 1 https://github.com/Yassine-Jemi01/yspm.git /tmp/yspm-build
+          cd /tmp/yspm-build
+          git checkout --detach 6a7535f6a6206b375eb0e1f6ba7cabc649f69e99
+
+          CGO_ENABLED=0 GOTOOLCHAIN=local /tmp/go/bin/go build             -trimpath             -buildvcs=false             -ldflags='-s -w'             -o "$GITHUB_WORKSPACE/stage/usr/bin/yspm"             ./cmd/yspm
+
+          chmod 0755 "$GITHUB_WORKSPACE/stage/usr/bin/yspm"
+          printf '%s
+' '#!/bin/sh' 'exit 0' > "$GITHUB_WORKSPACE/stage/etc/installer/yspm/install"
+          chmod 0711 "$GITHUB_WORKSPACE/stage/etc/installer/yspm/install"
+          printf '%s
+' 'yspm 0.2.0 go' > "$GITHUB_WORKSPACE/stage/etc/installer/yspm/pkinfo"
+          printf '%s
+' '#!/bin/sh' 'rm -f /usr/bin/yspm' > "$GITHUB_WORKSPACE/stage/etc/installer/yspm/uninstall"
+          chmod 0711 "$GITHUB_WORKSPACE/stage/etc/installer/yspm/uninstall"
+
+          cd "$GITHUB_WORKSPACE"
+          touch -d '@0' stage/usr/bin/yspm stage/etc/installer/yspm/install stage/etc/installer/yspm/pkinfo stage/etc/installer/yspm/uninstall
+
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -cpzf repo/yspm.tar -C stage .
+
+          sha256sum repo/yspm.tar | tee /tmp/yspm.sha256
+
+          grep -vE '^[[:xdigit:]]{64}[[:space:]]+yspm\.tar[[:space:]]+yspm$' repo/list.sha256 > /tmp/list.sha256
+          awk '{print $1 "  yspm.tar\tyspm"}' /tmp/yspm.sha256 >> /tmp/list.sha256
+          mv /tmp/list.sha256 repo/list.sha256
+
+      - name: Commit generated package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add repo/yspm.tar repo/list.sha256
+          git diff --cached --quiet && exit 0
+          git commit -m "add yspm package archive"
+          git push
