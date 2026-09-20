@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-iso:
@@ -118,10 +118,24 @@ jobs:
           xorriso -indev HardcoreLinux-ObsidianCore-GNOME.iso -find /live -name 'filesystem.erofs'
           test $(stat -c %s HardcoreLinux-ObsidianCore-GNOME.iso) -gt 1000000000
 
-      - name: Upload ISO
+      - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: HardcoreLinux-ObsidianCore-GNOME
           path: HardcoreLinux-ObsidianCore-GNOME.iso
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eux
+          TAG="v1.0.0-gnome"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
+          fi
+          gh release create "$TAG" HardcoreLinux-ObsidianCore-GNOME.iso             --repo "$GITHUB_REPOSITORY"             --title "HardCore Linux 1.0.0 GNOME - ObsidianCore"             --notes "HardCore Linux GNOME live ISO based on the Chimera Linux musl GNOME userland, with yspm, HardCore branding, and HardCore init integration.
+
+SHA256:
+88cccfc777f5a625697a6d00969070945ca5c01a9b959733d9e0947cf57bde78"
