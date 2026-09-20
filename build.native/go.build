@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -eu
+
+wd=$(pwd)
+work=/tmp/go-hardcore
+stage=/tmp/stage
+
+rm -rf "$work" "$stage"
+mkdir -p "$work" "$stage/usr/local" "$stage/usr/bin" "$stage/etc/installer/go"
+
+url=https://go.dev/dl/go1.27.1.linux-amd64.tar.gz
+sha256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
+
+curl -L --fail --silent --show-error "$url" -o "$work/go.tar.gz"
+printf '%s  %s\n' "$sha256" "$work/go.tar.gz" | sha256sum -c -
+
+tar -xzf "$work/go.tar.gz" -C "$stage/usr/local"
+ln -s /usr/local/go/bin/go "$stage/usr/bin/go"
+ln -s /usr/local/go/bin/gofmt "$stage/usr/bin/gofmt"
+
+cat > "$stage/etc/installer/go/pkinfo" <<'PKINFO'
+go 1.27.1
+PKINFO
+
+cat > "$stage/etc/installer/go/install" <<'INSTALL'
+#!/bin/sh
+exit 0
+INSTALL
+chmod 0711 "$stage/etc/installer/go/install"
+
+cd "$wd"
+./flashpack "$stage"
+cp "$stage"/*.tar .
+rm -rf "$work"
