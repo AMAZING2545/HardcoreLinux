@@ -93,8 +93,8 @@ int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
 			st->st_ctime = k.created;
 			st->st_mtime = k.modified;
 			st->st_atime = k.modified;
-
 			filler(buf, (data+j)->name, st, 0, 0);
+			free(st);
                 }
         }
         free(data);
@@ -224,22 +224,27 @@ int axfs_link(const char *linkpath, const char *target){
         *(path+last_slash_pos)=0;
         puts(path+last_slash_pos+1);
         uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
-        if(inum==-1||inum==-2)
+        if(inum==-1||inum==-2){
+		free(path);
                 return -EACCES;
+	}
         if(inum>>32==0){
                 puts("not a directory");
+		free(path);
                 return -ENOENT;
         }
         if(inum>>32==2){
                 puts("refusing to follow symlink");
-                return -ENOENT;
+                free(path);
+		return -ENOENT;
         }
         inode inod;
         get_inode(a, inum, &inod, fd);
         //check permissions (r, w and x)
         if(eval_permissions(a,inum, 07, user, &groups, groupc, fd)){
                 puts("permission denied");
-                return -EACCES;
+                free(path);
+		return -EACCES;
         }
         //check if file already exists
         file* dir=calloc(inod.size/128,128);
@@ -253,14 +258,21 @@ int axfs_link(const char *linkpath, const char *target){
                 else{
                         if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
                                 printf("%s, exists\n",path+last_slash_pos+1);
-                                return -EEXIST;
+                                free(path);
+				return -EEXIST;
                         }
                 }
         }
         inode new_inode={0,0,0,0,0,0,0,0,{0,0}};
         uint64_t new_inum = path2inode (a, linkpath, user, &groups, groupc, fd);
-        if(new_inum==-1) return -EPERM;
-	if(new_inum==-2) return -EACCES;
+        if(new_inum==-1){
+		free(path);
+		return -EPERM;
+	}
+	if(new_inum==-2){
+		free(path);
+		return -EACCES;
+	}
 	//if(new_inum>>32!=0)
 	//	return -EPERM;
 	get_inode(a, new_inum, &new_inode,fd);
@@ -273,6 +285,7 @@ int axfs_link(const char *linkpath, const char *target){
                 write_inode(a,inum,&new_file,inod.size,128,fd);
         else
                 write_inode(a,inum,&new_file,128*free_slot,128,fd);
+	free(path);
         return 0;
 }
 
@@ -318,7 +331,10 @@ int axfs_rmdir(const char *path){
 	for(int i = 0; i<inod.size/128; i++)
 		if(*((char*)(dir+i))!=0) counter++;
 	printf("subdirs: %d\n",counter);
-	if(counter > 2) return -ENOENT;
+	if(counter > 2){
+		free(dir);
+		return -EACCES;
+	}
 	//unlink . , .. and the directory itself
 	char* dotdot = calloc(4096,1);
 	int count = 0;
@@ -326,11 +342,12 @@ int axfs_rmdir(const char *path){
 		if(*(path+i)==0){*(dotdot+i)='/';	count=i+1;	break;}
 		*(dotdot+i) = *(path+i);
 	}
+	free(dir);
 	*(dotdot+count)='.';
 	*(dotdot+count+1)='.';
 	printf("unlinking %s\n",dotdot);
 	uint64_t status = unlink_file(a, dotdot, user, &groups, groupc, fd);
-	//free(dotdot);
+	free(dotdot);
 	if(status==-1||status==-2)
                 return -EACCES;
         if(status>>32==2){
@@ -490,7 +507,6 @@ int axfs_rename(const char *oldpath, const char *newpath, unsigned int f){
                                 last_slash_pos = i;
                 }
                 *(old+last_slash_pos)=0;
-                free(dotdot);
                 dotdot = calloc(4096,1);
                 count=0;
                 for(int i = 0; i<4096; i++){

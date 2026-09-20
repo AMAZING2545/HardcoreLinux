@@ -618,13 +618,17 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 	*(path+last_slash_pos)=0;
 	puts(path+last_slash_pos+1);
 	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
-	if(inum==-1||inum==-2)
+	if(inum==-1||inum==-2){
+		free(path);
 		return -1;
+	}
 	if(inum>>32==0){
+		free(path);
 		puts("not a directory");
 		return -2;
 	}
 	if(inum>>32==2){
+		free(path);
 		puts("refusing to follow symlink");
 		return -1;
 	}
@@ -633,6 +637,7 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 	//check permissions (r, w and x)
 	if(eval_permissions(a,inum, 07, user, groups, groupc, fd)){
 		puts("permission denied");
+		free(path);
 		return -1;
 	}
 	//check if file already exists
@@ -647,6 +652,8 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 		else{
 			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
 				puts("name already taken");
+				free(path);
+				free(dir);
 				return -1;
 			}
 		}
@@ -654,6 +661,8 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 	inode new_inode={permissions,user,*groups,0,0,0,0,0,{0,0}};
 	uint32_t new_inum = create_new_inode(a,&new_inode,fd);
 	if(new_inum==-1){
+		free(path);
+		free(dir);
 		puts("error making inode");
 		return -3;
 	}
@@ -665,6 +674,8 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 		write_inode(a,inum,&new_file,inod.size,128,fd);
 	else
 		write_inode(a,inum,&new_file,128*free_slot,128,fd);
+	free(path);
+	free(dir);
 	return new_inum;
 }
 
@@ -680,13 +691,17 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 	*(path+last_slash_pos)=0;
 	puts(path+last_slash_pos+1);
 	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
-	if(inum==-1||inum==-2)
-		return -1;
-	if(inum>>32==0){
-		puts("not a directory");
+	if(inum==-1||inum==-2){
+		free(path);
 		return -1;
 	}
+	if(inum>>32==0){
+		free(path);
+		puts("not a directory");
+		return -2;
+	}
 	if(inum>>32==2){
+		free(path);
 		puts("refusing to follow symlink");
 		return -1;
 	}
@@ -694,6 +709,7 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 	get_inode(a, inum, &inod, fd);
 	//check permissions (r, w and x)
 	if(eval_permissions(a,inum, 07, user, groups, groupc, fd)){
+		free(path);
 		puts("permission denied");
 		return -1;
 	}
@@ -709,6 +725,8 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 		else{
 			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
 				puts("name already taken");
+				free(path);
+				free(dir);
 				return -2;
 			}
 		}
@@ -722,6 +740,7 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 	modify_inode(a,new_inum,&new_inode,fd);
 	if(new_inum==-1){
 		puts("error making inode");
+		free(path);
 		return -1;
 	}
 	printf("new inode: %d\n", new_inum);
@@ -734,10 +753,12 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 	else
 		write_inode(a,inum,&new_file,128*free_slot,128,fd);
 	//make . and ..
+	free(path);
 	dir=calloc(256,1);
 	*(dir+0)=(file){".",1,new_inum};
 	*(dir+1)=(file){"..",1,inum};
 	write_inode(a, new_inum, dir, 0, 256, fd);
+	free(dir);
 	return new_inum;
 }
 
@@ -754,13 +775,17 @@ int64_t create_symlink(header* a, char* p, char* dest, uint16_t user, uint16_t* 
 	*(path+last_slash_pos)=0;
 	puts(path+last_slash_pos+1);
 	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
-	if(inum==-1||inum==-2)
+	if(inum==-1||inum==-2){
+		free(path);
 		return -1;
+	}
 	if(inum>>32==0){
+		free(path);
 		puts("not a directory");
 		return -2;
 	}
 	if(inum>>32==2){
+		free(path);
 		puts("refusing to follow symlink");
 		return -1;
 	}
@@ -783,6 +808,8 @@ int64_t create_symlink(header* a, char* p, char* dest, uint16_t user, uint16_t* 
 		else{
 			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
 				puts("name already taken");
+				free(path);
+				free(dir);
 				return -1;
 			}
 		}
@@ -808,6 +835,8 @@ int64_t create_symlink(header* a, char* p, char* dest, uint16_t user, uint16_t* 
 		write_inode(a,inum,&new_file,inod.size,128,fd);
 	else
 		write_inode(a,inum,&new_file,128*free_slot,128,fd);
+	free(path);
+	free(dir);
 	return new_inum;
 }
 
@@ -823,15 +852,21 @@ uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	*(path+last_slash_pos)=0;
 	puts(path+last_slash_pos+1);
 	uint64_t inum = path2inode (a, path, user, groups, groupc, fd);
-	if(inum==-1)
+	if(inum==-1){
+		free(path);
 		return -1;
-	if(inum==-2)
+	}
+	if(inum==-2){
+		free(path);
 		return -2;
+	}
 	if(inum>>32==0){
+		free(path);
 		puts("not a directory");
 		return -1;
 	}
 	if(inum>>32==2){
+		free(path);
 		puts("refusing to follow symlink");
 		return -1;
 	}
@@ -860,9 +895,9 @@ uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16
 		}
 	}
 	puts("no such file or directory");
-	return -1;
 	free(dir);
 	free(path);
+	return -1;
 	success:
 	//delete entry and decrement link count
 	puts("deleting entry");
@@ -891,4 +926,3 @@ uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	}
 	return del.links;
 }
-
