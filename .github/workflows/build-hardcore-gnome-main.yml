@@ -115,7 +115,7 @@ jobs:
         run: |
           set -eux
           xorriso -indev HardcoreLinux-ObsidianCore-GNOME.iso -report_el_torito plain
-          xorriso -indev HardcoreLinux-ObsidianCore-GNOME.iso -find /live -name 'filesystem.erofs' -print
+          xorriso -indev HardcoreLinux-ObsidianCore-GNOME.iso -find /live -name 'filesystem.erofs'
           test $(stat -c %s HardcoreLinux-ObsidianCore-GNOME.iso) -gt 1000000000
 
       - name: Upload ISO
