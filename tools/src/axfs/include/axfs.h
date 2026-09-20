@@ -563,30 +563,32 @@ uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16
 			int cmp = strcmp((dir+j)->name, *(pathv+i));
 			if(cmp==0){
 				dirstruct=*(dir+j);
-				goto found;
+				break;
+			}
+			if(j+1==directory.size/128){
+				free(path);
+				free(pathv);
+				free(dir);
+				puts("no such file or directory");
+				return -1; //no such file or directory
 			}
 		}
-		free(path);
-		free(pathv);
-		free(dir);
-		puts("no such file or directory");
-		return -1; //no such file or directory
-		found:
 		free(dir);
 		//stop at symlink
 		if(dirstruct.attributes==2){
 			//safe to break
-			free(path);
-			free(pathv);
 			break;
 		}
 		if(dirstruct.attributes==1){
 			//directory
 			get_inode(a,dirstruct.inode,&directory,fd);
-			dir=malloc(directory.size+1);
+			dir=malloc(directory.size);
 			//check execute bit
 			if (eval_permissions(a,dirstruct.inode, 01, user, groups, groupc, fd)){
 				puts("permission denied");
+				free(dir);
+				free(path);
+				free(pathv);
 				return -2;
 			}
 			read_inode(a,dirstruct.inode,&directory,dir,0,directory.size,fd);
@@ -603,6 +605,9 @@ uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	inode inod;
 	get_inode(a,dirstruct.inode,&inod,fd);
 	printf("inode: %d, links %d\n",dirstruct.inode,inod.links);
+	free(path);
+	free(pathv);
+	free(dir);
 	return dirstruct.inode|((uint64_t)dirstruct.attributes<<32);
 }
 

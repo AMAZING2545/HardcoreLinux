@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <sys/statvfs.h>
 
+
 int fd;
 header* a=NULL;
 
@@ -525,6 +526,7 @@ int axfs_rename(const char *oldpath, const char *newpath, unsigned int f){
         return 0;
 }
 
+
 static struct fuse_operations axfs = {
     .getattr    = axfs_getattr,
     .readdir    = axfs_readdir,
@@ -547,6 +549,7 @@ static struct fuse_operations axfs = {
     .rename	= axfs_rename,
 };
 
+
 int main(int argc, char* argv[]){
 	a=malloc(sizeof(header));
 	fd = open(argv[1],O_RDWR);
@@ -566,5 +569,6 @@ int main(int argc, char* argv[]){
 	inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
 	printf("address of inodes: %lu\n\n",inodes);
 	last=calloc((inode_length/32),12);
+
 	return fuse_main(argc-1, argv, &axfs, NULL);
 }
