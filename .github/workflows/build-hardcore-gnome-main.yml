@@ -21,22 +21,24 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xorriso squashfs-tools qemu-system-x86
+          sudo apt-get install -y xorriso squashfs-tools qemu-system-x86 e2fsprogs
 
       - name: Download Chimera GNOME live ISO
         run: |
           curl -fL --retry 3             https://repo.chimera-linux.org/live/latest/chimera-linux-x86_64-LIVE-20251220-gnome.iso             -o /tmp/chimera-gnome.iso
 
-      - name: Extract ISO and root filesystem
+      - name: Extract ISO and LiveOS root filesystem
         run: |
           set -eux
           rm -rf work iso-tree
           mkdir -p work iso-tree
           xorriso -osirrox on -indev /tmp/chimera-gnome.iso -extract / iso-tree
-          SQFS="$(find iso-tree -type f -name '*.squashfs' | head -n 1)"
-          test -n "$SQFS"
-          echo "SQFS=$SQFS" >> "$GITHUB_ENV"
-          unsquashfs -d work/rootfs "$SQFS"
+          test -f iso-tree/LiveOS/squashfs.img
+          unsquashfs -d work/live iso-tree/LiveOS/squashfs.img
+          test -f work/live/LiveOS/rootfs.img
+          mkdir -p work/rootfs
+          sudo mount -o loop work/live/LiveOS/rootfs.img work/rootfs
+          sudo chmod -R u+rwX work/rootfs
 
       - name: Build yspm
         uses: actions/setup-go@v5
@@ -53,15 +55,16 @@ jobs:
           CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -buildvcs=false -ldflags='-s -w' -o /tmp/yspm-bin ./cmd/yspm
           chmod 0755 /tmp/yspm-bin
 
-      - name: Apply Hardcore branding and yspm
+      - name: Apply Hardcore branding, yspm and init
         run: |
           set -eux
           ROOT=work/rootfs
-          install -D -m 0755 /tmp/yspm-bin "$ROOT/usr/bin/yspm"
-          install -D -m 0755 tools/init "$ROOT/usr/local/sbin/hardcore-init"
-          install -D -m 0755 tools/initctl "$ROOT/usr/local/sbin/hardcore-initctl"
 
-          cat > "$ROOT/etc/hardcore-release" <<'EOF'
+          sudo install -D -m 0755 /tmp/yspm-bin "$ROOT/usr/bin/yspm"
+          sudo install -D -m 0755 tools/init "$ROOT/usr/local/sbin/hardcore-init"
+          sudo install -D -m 0755 tools/initctl "$ROOT/usr/local/sbin/hardcore-initctl"
+
+          sudo tee "$ROOT/etc/hardcore-release" >/dev/null <<'EOF'
           NAME="HardCore Linux"
           VERSION="1.0.0-GNOME"
           EDITION="ObsidianCore"
@@ -70,39 +73,69 @@ jobs:
           EOF
 
           if [ -f "$ROOT/etc/os-release" ]; then
-            sed -i               -e 's/^NAME=.*/NAME="HardCore Linux"/'               -e 's/^PRETTY_NAME=.*/PRETTY_NAME="HardCore Linux GNOME"/'               -e 's/^ID=.*/ID=hardcore/'               -e 's/^VERSION=.*/VERSION="1.0.0-GNOME"/'               -e 's#^HOME_URL=.*#HOME_URL="https://github.com/Yassine-Jemi01/HardcoreLinux"#'               "$ROOT/etc/os-release" || true
+            sudo sed -i               -e 's/^NAME=.*/NAME="HardCore Linux"/'               -e 's/^PRETTY_NAME=.*/PRETTY_NAME="HardCore Linux GNOME"/'               -e 's/^ID=.*/ID=hardcore/'               -e 's/^VERSION=.*/VERSION="1.0.0-GNOME"/'               -e 's#^HOME_URL=.*#HOME_URL="https://github.com/Yassine-Jemi01/HardcoreLinux"#'               "$ROOT/etc/os-release" || true
           fi
 
-          mkdir -p "$ROOT/usr/share/applications"
-          cat > "$ROOT/usr/share/applications/yspm.desktop" <<'EOF'
+          sudo mkdir -p "$ROOT/usr/share/applications"
+          sudo tee "$ROOT/usr/share/applications/yspm.desktop" >/dev/null <<'EOF'
           [Desktop Entry]
           Type=Application
           Name=yspm
           Comment=HardCore Linux package manager
-          Exec=gnome-terminal -- yspm
+          Exec=gnome-console -- yspm
           Terminal=false
           Categories=System;
           EOF
 
-      - name: Repack GNOME filesystem
+      - name: Validate GNOME and yspm
         run: |
           set -eux
-          mv "$SQFS" "$SQFS.orig"
-          mksquashfs work/rootfs "$SQFS" -comp zstd -noappend -processors "$(nproc)"
-          rm -rf work/rootfs "$SQFS.orig"
+          test -x work/rootfs/usr/bin/gnome-shell
+          test -x work/rootfs/usr/bin/yspm
+          test -x work/rootfs/usr/local/sbin/hardcore-init
+
+      - name: Unmount root filesystem
+        if: always()
+        run: |
+          sudo umount work/rootfs 2>/dev/null || true
+
+      - name: Repack LiveOS squashfs
+        run: |
+          set -eux
+          rm -rf work/live-new
+          mkdir -p work/live-new
+          unsquashfs -d work/live-new iso-tree/LiveOS/squashfs.img
+          mkdir -p work/live-new/LiveOS
+          sudo mount -o loop work/live-new/LiveOS/rootfs.img work/live-new/LiveOS/rootfs-mount
+          sudo chmod -R u+rwX work/live-new/LiveOS/rootfs-mount
+          sudo install -D -m 0755 /tmp/yspm-bin work/live-new/LiveOS/rootfs-mount/usr/bin/yspm
+          sudo install -D -m 0755 tools/init work/live-new/LiveOS/rootfs-mount/usr/local/sbin/hardcore-init
+          sudo install -D -m 0755 tools/initctl work/live-new/LiveOS/rootfs-mount/usr/local/sbin/hardcore-initctl
+          sudo tee work/live-new/LiveOS/rootfs-mount/etc/hardcore-release >/dev/null <<'EOF'
+          NAME="HardCore Linux"
+          VERSION="1.0.0-GNOME"
+          EDITION="ObsidianCore"
+          BASE="Chimera Linux musl userland"
+          PACKAGE_MANAGER="yspm"
+          EOF
+          sync
+          sudo umount work/live-new/LiveOS/rootfs-mount
+          rm -rf work/live-new/LiveOS/rootfs-mount
+          rm -f iso-tree/LiveOS/squashfs.img
+          mksquashfs work/live-new iso-tree/LiveOS/squashfs.img -comp zstd -noappend -processors $(nproc)
 
       - name: Rebuild bootable ISO
         run: |
           set -eux
-          rm -f HardcoreLinux-ObsidianCore-GNOME.iso
           xorriso             -indev /tmp/chimera-gnome.iso             -outdev "$PWD/HardcoreLinux-ObsidianCore-GNOME.iso"             -boot_image any replay             -map "$PWD/iso-tree" /             -commit             -end
           test -s HardcoreLinux-ObsidianCore-GNOME.iso
           xorriso -indev HardcoreLinux-ObsidianCore-GNOME.iso -report_el_torito plain
 
-      - name: Validate payload
+      - name: Validate ISO contents
         run: |
           set -eux
-          unsquashfs -ll "$SQFS" | grep -E '/usr/bin/gnome-shell$|/usr/bin/yspm$|/usr/local/sbin/hardcore-init$'
+          xorriso -indev HardcoreLinux-ObsidianCore-GNOME.iso -find /LiveOS -name 'squashfs.img' -print
+          test $(stat -c %s HardcoreLinux-ObsidianCore-GNOME.iso) -gt 1000000000
 
       - name: Upload ISO
         uses: actions/upload-artifact@v4
