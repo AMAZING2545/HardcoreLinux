@@ -1,46 +1,42 @@
 #!/bin/sh
 
+set -eu
+
 wd=$(pwd)
+src=/tmp/yspm-build
+stage=/tmp/stage
 
-cat << 'EOF'
-packages needed:
+go_bin=/usr/local/go/bin/go
+if [ ! -x "$go_bin" ]; then
+    go_bin=$(command -v go || true)
+fi
+if [ -z "$go_bin" ] || [ ! -x "$go_bin" ]; then
+    echo "yspm.build: Go 1.27.1 is required (install the go package first)" >&2
+    exit 1
+fi
 
-curl
-git
-flashpack
-EOF
+rm -rf "$src" "$stage"
+git clone --depth 1 https://github.com/Yassine-Jemi01/yspm.git "$src"
+cd "$src"
+git checkout --detach 6a7535f6a6206b375eb0e1f6ba7cabc649f69e99
 
-rm -r /tmp/yspm-build /tmp/go 2>/dev/null
-mkdir -p /tmp/yspm-build /tmp/go
+mkdir -p "$stage/usr/bin" "$stage/etc/installer/yspm"
 
-curl -L --fail --silent --show-error \
-  https://go.dev/dl/go1.25.13.linux-amd64.tar.gz \
-  -o /tmp/go.tar.gz
+CGO_ENABLED=0 GOTOOLCHAIN=local "$go_bin" build \
+    -trimpath \
+    -buildvcs=false \
+    -ldflags='-s -w' \
+    -o "$stage/usr/bin/yspm" \
+    ./cmd/yspm
 
-echo "39042a078ea9ceebe3ecda4a7188f0f5b96e14a071d27923ba7f40b456e85ae3  /tmp/go.tar.gz" | sha256sum -c -
-
-tar -xzf /tmp/go.tar.gz -C /tmp/go --strip-components=1
-
-git clone --depth 1 --branch v0.2.0 \
-  https://github.com/Yassine-Jemi01/yspm.git \
-  /tmp/yspm-build
-
-mkdir -p /tmp/stage/usr/bin
-mkdir -p /tmp/stage/etc/installer/yspm
-
-cd /tmp/yspm-build
-
-CGO_ENABLED=0 \
-  /tmp/go/bin/go build \
-  -trimpath \
-  -buildvcs=false \
-  -ldflags="-s -w" \
-  -o /tmp/stage/usr/bin/yspm \
-  ./cmd/yspm
-
-echo "yspm 0.2.0 Go x86_64" > /tmp/stage/etc/installer/yspm/pkinfo
+chmod 0755 "$stage/usr/bin/yspm"
+printf '%s\n' '#!/bin/sh' 'exit 0' > "$stage/etc/installer/yspm/install"
+chmod 0711 "$stage/etc/installer/yspm/install"
+printf '%s\n' 'yspm 0.2.0 go' > "$stage/etc/installer/yspm/pkinfo"
+printf '%s\n' '#!/bin/sh' 'rm -f /usr/bin/yspm' > "$stage/etc/installer/yspm/uninstall"
+chmod 0711 "$stage/etc/installer/yspm/uninstall"
 
 cd "$wd"
-
-./flashpack /tmp/stage
-cp /tmp/stage/*.tar .
+./flashpack "$stage"
+cp "$stage"/*.tar .
+rm -rf "$src"
