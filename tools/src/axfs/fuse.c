@@ -6,7 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include "include/axfs.h"
+#include "include/axfss.h"
 #include <limits.h>
 #include <sys/statvfs.h>
 
@@ -103,6 +103,7 @@ int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
 }
 
 int axfs_open(const char *path, struct fuse_file_info *fi) {
+
 	fi->direct_io = 1;
 	struct fuse_context *ctx = fuse_get_context();
 	uint16_t user= ctx->uid;
@@ -139,6 +140,21 @@ int axfs_open(const char *path, struct fuse_file_info *fi) {
 		shrink_inode(a, inum, i.size ,fd);
 	fi->fh=(uint32_t)inum;
 	puts("got there");
+	if( 1 ){
+                //scan for the inode
+                uint32_t uses=-1;
+                int32_t use=0;
+                int64_t  most_used=-1;
+                for(int i = 0; i<(1<<16)-1; i++){
+                        if((last+i)->uses>use){
+                                if(most_used<i && most_used!=-1)
+                                        pivot_cache(i, most_used);
+                                most_used=i;
+                                use=(last+i)->uses;
+                        }
+                }
+        }
+
 	//free(gr);
 	//free(groups);
 	return 0;
@@ -186,7 +202,7 @@ int axfs_create(const char *path, mode_t mode, struct fuse_file_info *fi){
 	uint64_t inod=create_file(a, path,mode,user,&groups,groupc, fd);
 	switch(inod){
 		case -1:
-			return -EACCES;
+			return -EEXIST;
 		case -2:
 			return -ENOENT;
 		default:
@@ -334,7 +350,7 @@ int axfs_rmdir(const char *path){
 	printf("subdirs: %d\n",counter);
 	if(counter > 2){
 		free(dir);
-		return -EACCES;
+		return -ENOTEMPTY;
 	}
 	//unlink . , .. and the directory itself
 	char* dotdot = calloc(4096,1);
@@ -526,6 +542,19 @@ int axfs_rename(const char *oldpath, const char *newpath, unsigned int f){
         return 0;
 }
 
+int axfs_release(const char *path, struct fuse_file_info *fi){
+	//flush inode cache
+	write(1,"releasing handle\n",18);
+	for(int i = 0;i<1<<16; i++){
+		if((last+i)->inode==fi->fh){
+			(last+i)->uses=0;
+			(last+i)->offset=0;
+			(last+i)->inode=-1;
+			break;
+		}
+	}
+	return 0;
+}
 
 static struct fuse_operations axfs = {
     .getattr    = axfs_getattr,
@@ -547,6 +576,7 @@ static struct fuse_operations axfs = {
     .utimens	= axfs_utimens,
     .statfs	= axfs_statfs,
     .rename	= axfs_rename,
+    .release	= axfs_release,
 };
 
 
@@ -568,7 +598,6 @@ int main(int argc, char* argv[]){
 		perror("mmap failed");
 	inodes=mmap(NULL, inode_length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, inode_start);
 	printf("address of inodes: %lu\n\n",inodes);
-	last=calloc((inode_length/32),12);
-
+	last=calloc(1<<16,sizeof(last_page));
 	return fuse_main(argc-1, argv, &axfs, NULL);
 }

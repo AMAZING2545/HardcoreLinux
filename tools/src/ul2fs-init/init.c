@@ -15,9 +15,9 @@ int main(){
 	pid_t pid = fork();
 	if (pid == 0) {
 		mount("devtmpfs", "/dev", "devtmpfs", 0, NULL);
-		char* argv[] = {"ul2fs","/dev/sda2","/newroot", "-s","-o", "allow_other",(char*)0};
+		char* argv[] = {"ul2fs","/dev/sda2","/newroot", "-s","f","-o", "allow_other",(char*)0};
 		if(execv("/sbin/ul2fs", argv))
-			perror("execve failed");
+			perror("execve(child) failed");
     	}
 	else {
         	//wait at least 2 seconds to mount
@@ -33,5 +33,9 @@ int main(){
 		char* argv[] = {"init",(char*)0};
 		if(execv("/etc/init", argv))
 			perror("execve(parent) failed");
+		puts("system is deadlocked: cannot execve new init");
+		puts("either pivot_root failed or the child died");
+		puts("entering a coma for 1.5 minutes");
+		sleep(100);
 	}
 }

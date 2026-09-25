@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>
+//#include <linux/fs.h>
 #include <math.h>
 #include <string.h>
 #include <errno.h>
@@ -90,11 +90,23 @@ inode* inodes = NULL;
 
 
 typedef struct {
-	page pag;
-	uint64_t offset;
+        page pag;
+        uint64_t offset;
+        uint32_t inode;
+        uint32_t uses;
 }last_page;
 
-last_page* last = NULL;
+uint8_t cache_lock=0;
+
+last_page* last=NULL;
+
+void pivot_cache(int32_t a, int32_t b){
+	printf("pivoting cache entry % with %\n",a,b);
+	last_page c = *(last+a);
+	*(last+a)=*(last+b);
+	*(last+b)=c;
+	return;
+}
 
 uint64_t min_free=0;
 
@@ -203,8 +215,18 @@ uint64_t shrink_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
 	const uint64_t blocksize = (1<<a->blocksize);
 	int64_t ret = 0;
 
-	(last+inode_num)->offset=0;
-	(last+inode_num)->pag = int2page(0);
+	for(int i = 0;i<(1<<16)-1;i++){
+                if((last+i)->inode==inode_num){
+                        cache_lock=1;
+			printf("zeroing inode %d at %d\n", inode_num, i);
+                        (last+i)->offset=0;
+                        (last+i)->pag = int2page(0);
+                        (last+i)->inode=0;
+                        (last+i)->uses=0;
+			cache_lock=0;
+                        break;
+                }
+        }
 
 	inode inode_struct;
 	if(get_inode(a, inode_num, &inode_struct, fd)==-1){
@@ -297,7 +319,8 @@ int64_t extend_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
                 puts("nonexistant inode");
                 return -1;
         }
-        uint64_t size = inode_struct.size;
+        printf("extend: inode: %d\n",inode_num);
+	uint64_t size = inode_struct.size;
         //calculate if we need new blocks
         if(size%blocksize+count<=blocksize){
                 if(size%blocksize==0) goto skip;
@@ -313,14 +336,37 @@ int64_t extend_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
         else block2stop = (size-1)/blocksize;
 	uint64_t alloc = (size+count-1)/blocksize-block2stop;
 	uint8_t lock = 0;
-	printf("cached offset: %lu\n",(last+inode_num)->offset);
-        printf("cached page: %lu\n",page2int((last+inode_num)->pag));
+	static unsigned int period = 0;
 
-	if( page2int((last+inode_num)->pag) != 0	&&	(last+inode_num)->offset<size ){
-		//recalculate seek
-		block2stop = (size-(last+inode_num)->offset-1)/blocksize;
-		current=(last+inode_num)->pag;
-	}
+	if( size>blocksize*12 ){
+                //scan for the inode
+		int64_t most_used=-1;
+		int32_t uses=0;
+                for(int i = 0; i<(1<<16)-1; i++){
+			//printf("scanning index %d with inode %d\n",i,(last+i)->inode);
+			if((last+i)->uses>uses && most_used!=-1){
+				most_used=i;
+				uses=(last+i)->uses;
+				if((period&7)==6)
+				if(most_used<i)
+					pivot_cache(i, most_used);
+			}
+			if((last+i)->inode==inode_num){
+                                printf("cache hit at %d for inode %d\n", i, inode_num);
+				if( page2int((last+i)->pag) != 0        &&      (last+i)->offset<size ){
+                                        //recalculate seek
+                                        block2stop = (size-(last+i)->offset-1)/blocksize;
+                                        current=(last+i)->pag;
+                                }
+                                (last+i)->uses+=1;
+				if((last+i)->uses>uses && most_used!=-1){
+					pivot_cache(i, most_used);
+				}
+				break;
+                        }
+                }
+		period++;
+        }
 
 	printf("size: %lu\n",size);
 	printf("traversing %lu blocks\n",block2stop);
@@ -334,7 +380,7 @@ int64_t extend_inode(header* a, uint32_t inode_num, uint64_t count, int fd){
 	uint64_t onelast=page2int(current);
 	for(uint64_t i=0; i<alloc;i++){
                 for(uint64_t j=free+1; j<fat_length/6;j++){
-			printf("traversing block %lu\n", j);
+			//printf("traversing block %lu\n", j);
 			if(page2int(*(fat+j))==0){
                                 printf("empty block at %lu\n",j);
                                 *(fat+page2int(current))=int2page(j);
@@ -370,6 +416,7 @@ int64_t write_inode(header *a, uint32_t inode_num, void *data,uint64_t seek, uin
 	const uint64_t data_start = blocksize * (a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
 	const uint64_t fat_length = blocksize * a->fatsize;
 	inode ino;
+	printf("write: inode: %d\n",inode_num);
 	if (get_inode(a,inode_num, &ino, fd) == -1) return -1;
 	if (seek > ino.size) return -1;
 
@@ -383,31 +430,93 @@ int64_t write_inode(header *a, uint32_t inode_num, void *data,uint64_t seek, uin
 	uint64_t seek_bytes= seek % blocksize;
 	page current = ino.start;
 	printf("seek blocks: %lu\n",seek_blocks);
-	printf("cached offset: %lu\n",(last+inode_num)->offset);
 	uint64_t seek_dif = seek_blocks;
 	//checking if cache hit:
-	if( page2int((last+inode_num)->pag) != 0	&&	(last+inode_num)->offset<=seek ){
-		//recalculate seek
-		seek_blocks = (seek-(last+inode_num)->offset)/blocksize;
-		seek_bytes = (seek-(last+inode_num)->offset)%blocksize;
-		current=(last+inode_num)->pag;
-	}
 
-	seek_dif-=seek_blocks;
-        printf("cached page: %lu\n",page2int((last+inode_num)->pag));
-	printf("seek blocks: %lu\n",seek_blocks);
-	// 7. Traverse FAT to starting block
-	uint64_t traversed=0;
-	for (uint64_t i = 0; i < seek_blocks; i++) {
-		printf("going to block %lu\n",page2int(current));
-		current = *(fat + page2int(current));
-		traversed++;
-		if(i==seek_blocks-2){
-			puts("caching entry");
-			(last+inode_num)->pag=current;
-			(last+inode_num)->offset=(seek_dif+traversed)*blocksize;
-		}
-	}
+	int32_t index = -1;
+        int32_t freeblock = -1;
+        int32_t leastused = -1;
+	static unsigned int period=0;
+        if( seek_blocks>5 ){
+                //scan for the inode
+                uint32_t uses=-1;
+		int32_t use=0;
+		int64_t  most_used=-1;
+                for(int i = 0; i<(1<<16)-1; i++){
+                        if((last+i)->uses>use){
+				use=(last+i)->uses;
+				if((period&8)==2){
+					if(most_used<i && most_used!=-1){
+						pivot_cache(i, most_used);
+					}
+				}
+				most_used=i;
+			}
+			if((last+i)->offset==0&&freeblock==-1){
+                                freeblock=i;
+                        }
+                        if((last+i)->uses<uses){
+                                uses=(last+i)->uses;
+                                leastused=i;
+                        }
+                        if((last+i)->inode==inode_num){
+				(last+i)->uses++;
+				if((last+i)->uses>uses && most_used!=-1){
+					if((last+i)->uses>use && most_used<i){
+						pivot_cache(i, most_used);
+						index=most_used;
+					}
+					else index=i;
+				}
+                                else index=i;
+                                break;
+                        }
+                }
+		period++;
+        }
+        printf("cached index: %d\n",index);
+        printf("freeblock: %d\n",freeblock);
+	if(index!=-1)
+        if( page2int((last+index)->pag) != 0    &&      (last+index)->offset<=seek ){
+                //recalculate seek
+                seek_blocks = (seek-(last+index)->offset)/blocksize;
+                seek_bytes = (seek-(last+index)->offset)%blocksize;
+                (last+index)->uses+=1;
+                current=(last+index)->pag;
+        }
+
+        seek_dif-=seek_blocks;
+	if(index!=-1)
+        printf("cached page: %lu\n",page2int((last+index)->pag));
+        printf("seek blocks: %lu\n",seek_blocks);
+        // 7. Traverse FAT to starting block
+        uint64_t traversed=0;
+        for (uint64_t i = 0; i < seek_blocks; i++) {
+                //printf("going to block %lu\n",page2int(current));
+                current = *(fat + page2int(current));
+                traversed++;
+                if(i==seek_blocks-2){
+			cache_lock=1;
+                        if(index!=-1){
+                                puts("caching entry");
+                                (last+index)->pag=current;
+                                (last+index)->offset=(seek_dif+traversed)*blocksize;
+                        }else if (freeblock!=-1){
+                                puts("caching entry(newblock)");
+                                (last+freeblock)->pag=current;
+                                (last+freeblock)->offset=(seek_dif+traversed)*blocksize;
+                                (last+freeblock)->inode=inode_num;
+                        }else if (leastused != -1){
+                                puts("caching entry(overwrite)");
+                                (last+leastused)->inode=inode_num;
+                                (last+leastused)->pag=current;
+                                (last+leastused)->offset=(seek_dif+traversed)*blocksize;
+                        }
+			cache_lock=0;
+			printf("offset: %lu, page: %lu\n",(seek_dif+traversed)*blocksize,page2int(current));
+                }
+        }
+
 	uint8_t *buf = (uint8_t*)data;
 	uint64_t bytes_written=0;
 	uint64_t remaining = count;
@@ -450,25 +559,76 @@ int64_t read_inode(header *a, uint32_t inode_num, inode *inode_struct,  void *da
 	if(seek + count > inode_struct->size)
 		count = inode_struct->size - seek;
 	if(!count) return 0;
-
+	printf("read: inode %d\n",inode_num);
 	uint64_t seek_blocks = seek / blocksize;
 	uint64_t seek_bytes  = seek % blocksize;
 	page current = inode_struct->start;
 	uint64_t seek_dif = seek_blocks;
 	//checking if cache hit:
-	if( page2int((last+inode_num)->pag) != 0	&&	(last+inode_num)->offset<=seek ){
-		//recalculate seek
-		seek_blocks = (seek-(last+inode_num)->offset)/blocksize;
-		seek_bytes = (seek-(last+inode_num)->offset)%blocksize;
-		current=(last+inode_num)->pag;
-	}
 
-	seek_dif-=seek_blocks;
+        int32_t index = -1;
+        int32_t freeblock = -1;
+        int32_t leastused = -1;
+        if( seek_blocks>5 ){
+                //scan for the inode
+                uint32_t uses=-1;
+                for(int i = 0; i<(1<<16)-1; i++){
+			if((last+i)->offset==0&&freeblock==-1){
+                                freeblock=i;
+                        }
+                        if((last+i)->uses<uses){
+                                uses=(last+i)->uses;
+                                leastused=i;
+                        }
+                        if((last+i)->inode==inode_num){
+                                index=i;
+                                break;
+                        }
+                }
+        }
+        printf("cached index: %d\n",index);
+        if(index!=-1)
+        if( page2int((last+index)->pag) != 0    &&      (last+index)->offset<=seek ){
+                //recalculate seek
+                seek_blocks = (seek-(last+index)->offset)/blocksize;
+                seek_bytes = (seek-(last+index)->offset)%blocksize;
+                (last+index)->uses+=1;
+                current=(last+index)->pag;
+        }
 
-	for (uint64_t i = 0; i < seek_blocks; i++) {
-        	if (page2int(current) == 0xFFFFFFFFFFFF)return -1;
-		current = *(fat + page2int(current));
-	}
+        seek_dif-=seek_blocks;
+	if(index!=-1)
+        printf("cached page: %lu\n",page2int((last+inode_num)->pag));
+        printf("seek blocks: %lu\n",seek_blocks);
+        // 7. Traverse FAT to starting block
+        uint64_t traversed=0;
+        for (uint64_t i = 0; i < seek_blocks; i++) {
+                printf("read: going to block %lu\n",page2int(current));
+                current = *(fat + page2int(current));
+                traversed++;
+		if(cache_lock==0)
+                if(i==seek_blocks-2){
+			cache_lock=1;
+                        if(index!=-1){
+                                puts("caching entry");
+                                (last+index)->pag=current;
+                                (last+index)->offset=(seek_dif+traversed)*blocksize;
+                        }else if (freeblock!=-1){
+                                puts("caching entry(newblock)");
+                                (last+freeblock)->pag=current;
+                                (last+freeblock)->offset=(seek_dif+traversed)*blocksize;
+                                (last+freeblock)->inode=inode_num;
+                        }else if (leastused != -1){
+                                puts("caching entry(overwrite)");
+                                (last+leastused)->inode=inode_num;
+                                (last+leastused)->pag=current;
+                                (last+leastused)->offset=(seek_dif+traversed)*blocksize;
+                        }
+			printf("page: %lu, offset: %lu\n",(seek_dif+traversed)*blocksize,page2int(current));
+                	cache_lock=0;
+		}
+        }
+
 	uint8_t *buf = (uint8_t *)data;
 	uint64_t bytes_read = 0;
 	uint64_t remaining = count;
@@ -547,7 +707,7 @@ uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16
 		}
 	}
 	printf("path: ");
-	write(0,path+1,4095);
+	write(1,path+1,4095);
 	puts("");
 	inode directory;
 	get_inode(a,0,&directory,fd);
@@ -557,8 +717,8 @@ uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	printf("size of root directory: %lu\n", directory.size);
 	for(int i=0; i<pathix; i++){
 		for(int j = 0; j<directory.size/128;j++){
-			if(*((char*)(dir+j))==0)
-				continue;
+			//if(*((char*)(dir+j))==0)
+			//	continue;
 			printf("comparing %s with %s\n",(dir+j)->name,*(pathv+i));
 			int cmp = strcmp((dir+j)->name, *(pathv+i));
 			if(cmp==0){
@@ -607,12 +767,13 @@ uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	printf("inode: %d, links %d\n",dirstruct.inode,inod.links);
 	free(path);
 	free(pathv);
-	if(dirstruct.attributes<<32 == 1)
+	if(dirstruct.attributes == 1)
 		free(dir);
 	return dirstruct.inode|((uint64_t)dirstruct.attributes<<32);
 }
 
 int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uint16_t* groups, uint16_t groupc, int fd){
+	puts("entered create_file");
 	//find the last entry
 	char* path = calloc(4096,1);
 	strcpy(path,p);
@@ -659,8 +820,9 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
 				puts("name already taken");
 				free(path);
+				inum=(dir+i)->inode;
 				free(dir);
-				return -1;
+				return inum;
 			}
 		}
 	}
@@ -732,8 +894,9 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
 				puts("name already taken");
 				free(path);
+				inum=(dir+i)->inode;
 				free(dir);
-				return -2;
+				return inum;
 			}
 		}
 	}
@@ -759,7 +922,6 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 	else
 		write_inode(a,inum,&new_file,128*free_slot,128,fd);
 	//make . and ..
-	free(path);
 	dir=calloc(256,1);
 	*(dir+0)=(file){".",1,new_inum};
 	*(dir+1)=(file){"..",1,inum};
@@ -815,8 +977,9 @@ int64_t create_symlink(header* a, char* p, char* dest, uint16_t user, uint16_t* 
 			if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
 				puts("name already taken");
 				free(path);
+				inum=(dir+i)->inode;
 				free(dir);
-				return -1;
+				return inum;
 			}
 		}
 	}
@@ -931,4 +1094,57 @@ uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16
 		else shrink_inode(a,inum,128,fd);
 	}
 	return del.links;
+}
+
+int64_t size_chain(header* a, page current, int fd){
+	const uint64_t blocksize = 1 << a->blocksize;
+	const uint64_t fat_start = blocksize * (a->resblocks + 1);
+	const uint64_t fat_length = blocksize * a->fatsize;
+	int64_t i;
+	if(page2int(current)==0xFFFFFFFFFFFF){
+		puts("FSCK: invalid FAT page");
+		return -1;
+	}
+	for(i = 0; i<fat_length/6; i++){
+		current=*(fat+page2int(current));
+		if(page2int(current)==0xFFFFFFFFFFFF){
+			printf("FSCK: chain length (zero indexed): %lu\n",i);
+			break;
+		}
+	}
+	return i;
+}
+
+int64_t scan_filesystem(header* a, int fd){
+	const uint64_t blocksize = 1 << a->blocksize;
+	const uint64_t fat_start = blocksize * (a->resblocks + 1);
+	const uint64_t data_start = blocksize * (a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
+	const uint64_t fat_length = blocksize * a->fatsize;
+
+	for(uint32_t i = 0; i< blocksize*a->inodes/32; i++){
+		if((inodes+i)->links==0)
+			continue;
+		printf("FSCK: info of inode %d\n",i);
+		printf("FSCK: \texpected size: %lu bytes\n\tstart: %lu\n",(inodes+i)->size,page2int((inodes+i)->start));
+		int64_t size = size_chain(a,(inodes+i)->start,fd);
+		printf("FSCK: \tactual size: %ld blocks\n",size);
+		if((inodes+i)->size!=0){
+			if(size==((inodes+i)->size-1)/blocksize)
+				puts("FSCK: inode OK\n");
+			else{
+				printf("FSCK: inode %du has errors\nFSCK: press y to repair, nothing to continue",i);
+				char answer;
+				read(0,&answer,1);
+				if(answer=='y'){
+					//compare size with clamped size
+					//int64_t clamped = (inodes+i)->size-1)/blocksize;
+					//if(clamped>size)
+					//shrink_inode(a,i,(inodes+i)->size-,fd
+				}
+			}
+		}
+		else if(size==0)
+			puts("FSCK: inode OK\n");
+	}
+	puts("FSCK complete");
 }
