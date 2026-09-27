@@ -104,7 +104,7 @@ int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
 
 int axfs_open(const char *path, struct fuse_file_info *fi) {
 
-	fi->direct_io = 1;
+	//fi->direct_io = 1;
 	struct fuse_context *ctx = fuse_get_context();
 	uint16_t user= ctx->uid;
 	printf("user: %d\n",user);
@@ -227,7 +227,7 @@ int axfs_unlink(const char *path) {
 int axfs_link(const char *linkpath, const char *target){
 	struct fuse_context *ctx = fuse_get_context();
 	uint16_t user= ctx->uid;
-	printf("link: user: %d\n",user);
+	printf("\nlink: user: %d\n\n",user);
         uint16_t groupc = 1;//getgroups(0, NULL)+1;
         uint16_t groups = ctx->gid;
 	//find the last entry
@@ -241,7 +241,7 @@ int axfs_link(const char *linkpath, const char *target){
         *(path+last_slash_pos)=0;
         puts(path+last_slash_pos+1);
         uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
-        if(inum==-1||inum==-2){
+	if(inum==-1||inum==-2){
 		free(path);
                 return -EACCES;
 	}
@@ -274,7 +274,7 @@ int axfs_link(const char *linkpath, const char *target){
                 }
                 else{
                         if(!strcmp(path+last_slash_pos+1,(dir+i)->name)){
-                                printf("%s, exists\n",path+last_slash_pos+1);
+				printf("%s, exists\n",path+last_slash_pos+1);
                                 free(path);
 				return -EEXIST;
                         }
@@ -295,7 +295,7 @@ int axfs_link(const char *linkpath, const char *target){
 	get_inode(a, new_inum, &new_inode,fd);
 	new_inode.links=new_inode.links+1;
 	modify_inode(a, new_inum, &new_inode,fd);
-	file new_file={" ",0,new_inum};
+	file new_file={" ",new_inum>>32,new_inum};
         strcpy(new_file.name, path+last_slash_pos+1);
         if(free_slot==-1)
                 //write after
@@ -492,7 +492,7 @@ int axfs_rename(const char *oldpath, const char *newpath, unsigned int f){
         //resolve its path
         const struct fuse_context *ctx = fuse_get_context();
         uint16_t user= ctx->uid;
-        printf("rmdir: user: %d\n",user);
+        printf("rename: user: %d\n",user);
         uint16_t groupc = 1;//getgroups(0, NULL)+1;
         uint16_t groups = ctx->gid;
         uint64_t inum = path2inode (a, oldpath ,user, &groups, groupc,fd);
@@ -501,7 +501,10 @@ int axfs_rename(const char *oldpath, const char *newpath, unsigned int f){
         if(inum==-1||inum==-2)
                 return -EACCES;
         //link to the new directory
-        axfs_link(oldpath,newpath);
+        if(axfs_link(oldpath,newpath)==-EEXIST){
+		axfs_unlink(newpath);
+		axfs_link(oldpath,newpath);
+	}
         if(inum>>32==1){ //directory
                 //unlink .. from original
                 char* dotdot = calloc(4096,1);

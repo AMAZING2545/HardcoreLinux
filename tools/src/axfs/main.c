@@ -49,9 +49,12 @@ int main(int argc, char* argv[]){
 		BUSYWAIT
 		get_inode(&boot, atoi(argv[2]), &result, fd);
 		printf("size of file: %lu\n", result.size);
+		printf("links: %d\n",result.links);
 		char* data=malloc(result.size);
 		printf("actual bytes read: %lu\n",read_inode(&boot, atoi(argv[2]), &result, data, 0, 2000, fd));
 		puts("data: ");
+		last=calloc(66000,sizeof(last_page));
+		delete_inode(&boot, atoi(argv[2]),fd);
 		write(0,data,2000);
 	}
 
