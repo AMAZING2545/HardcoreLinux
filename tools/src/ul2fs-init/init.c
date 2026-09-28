@@ -15,7 +15,7 @@ int main(){
 	pid_t pid = fork();
 	if (pid == 0) {
 		mount("devtmpfs", "/dev", "devtmpfs", 0, NULL);
-		char* argv[] = {"ul2fs","/dev/sda2","/newroot", "-s","f","-o", "allow_other",(char*)0};
+		char* argv[] = {"ul2fs","/dev/sda2","/newroot", "-s","-o", "allow_other,suid,default_permissions",(char*)0};
 		if(execv("/sbin/ul2fs", argv))
 			perror("execve(child) failed");
     	}

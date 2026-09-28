@@ -53,6 +53,11 @@ int axfs_getattr(const char *path, struct stat *st, struct fuse_file_info* info)
 	st->st_ctime = inod.created;
 	st->st_mtime = inod.modified;
 	st->st_atime = inod.modified;
+	if(inod.size!=0)
+		st->st_blocks = ((inod.size-1)>>9)+1;
+	else
+		st->st_blocks = 1;
+	st->st_blksize=1<<a->blocksize;
 	return 0;
 }
 
@@ -174,6 +179,11 @@ int axfs_write(const char *path, const char *buf, size_t size, off_t offset, str
 	inode inod;
 	if(get_inode(a, inum, &inod, fd)==-1) return -EIO;
 	if((fi->flags&O_ACCMODE)==O_RDONLY) return -EACCES;
+	if(offset>inod.size){
+		uint8_t* zeroes=calloc(1,(offset/4096+1)*4096);
+		write_inode(a, inum, zeroes, inod.size, offset-inod.size ,fd);
+		free(zeroes);
+	}
 	uint64_t bytes = write_inode(a, inum, buf, offset ,size,fd);
 	if(bytes==-1) return -EIO;
 	return bytes;

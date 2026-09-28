@@ -1,0 +1,19 @@
+#!/bin/sh
+
+#
+# download at https://github.com/libarchive/libarchive
+#
+
+wd=$(pwd)
+cd $dir
+rm -rf /tmp/stage
+./configure --prefix=/usr
+make DESTDIR=/tmp/stage install-libLTLIBRARIES -j$(nproc) 
+make DESTDIR=/tmp/stage install-pkgconfigDATA
+rm /tmp/stage
+mkdir -p /tmp/stage/etc/installer/libarchive
+echo 'libarchive 3.8.2 musl zlib openssl' > /tmp/stage/etc/installer/libarchive/pkinfo
+rm -r /tmp/stage/usr/share
+cd $wd
+./flashpack /tmp/stage
+cp /tmp/stage/*.tar .
