@@ -20,45 +20,45 @@ void* _init_(struct fuse_conn_info *conn, struct fuse_config *cfg) {
 }
 
 int axfs_getattr(const char *path, struct stat *st, struct fuse_file_info* info){
-	printf("requested path: %s\n", path);
-	struct fuse_context *ctx = fuse_get_context();
-	uint16_t user= ctx->uid;
-	uint16_t groupc = 1; //getgroups(0, NULL)+1;
-	uint16_t groups = ctx->gid;//malloc(groupc*2);
-	//gid_t* gr = malloc(groupc*4-4);
-	// *groups = getgid();
-	//getgroups(groupc-1, gr);
-	//for(int i = 0; i<groupc;i++)
-	//	groups[i+1]=gr[i];
-	uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
-	//free(gr);
-	//free(groups);
-	printf("user: %d\n",user);
-	if(inum==-1) return -ENOENT;
-	if(inum==-2) return -EACCES;
-	uint32_t dir;
-	if(inum>>32==1) dir = S_IFDIR;
-	else if (inum>>32==2) dir = S_IFLNK;
-	else dir = S_IFREG;
-	printf("inode: %d\n",inum);
+        printf("requested path: %s\n", path);
+        struct fuse_context *ctx = fuse_get_context();
+        uint16_t user= ctx->uid;
+        uint16_t groupc = 1; //getgroups(0, NULL)+1;
+        uint16_t groups = ctx->gid;//malloc(groupc*2);
+        //gid_t* gr = malloc(groupc*4-4);
+        // *groups = getgid();
+        //getgroups(groupc-1, gr);
+        //for(int i = 0; i<groupc;i++)
+        //      groups[i+1]=gr[i];
+        uint64_t inum = path2inode (a, path, user, &groups, groupc, fd);
+        //free(gr);
+        //free(groups);
+        printf("user: %d\n",user);
+        if(inum==-1) return -ENOENT;
+        if(inum==-2) return -EACCES;
+        uint32_t dir;
+        if(inum>>32==1) dir = S_IFDIR;
+        else if (inum>>32==2) dir = S_IFLNK;
+        else dir = S_IFREG;
+        printf("inode: %d\n",inum);
 
-	inode inod;
-	get_inode(a, inum, &inod, fd);
-	st->st_ino = (uint32_t)inum + 1;
-	st->st_mode = dir | inod.permissions;
-	st->st_nlink = inod.links;
-	st->st_size = inod.size;
-	st->st_uid = inod.user;
-	st->st_gid = inod.group;
-	st->st_ctime = inod.created;
-	st->st_mtime = inod.modified;
-	st->st_atime = inod.modified;
-	if(inod.size!=0)
-		st->st_blocks = ((inod.size-1)>>9)+1;
-	else
-		st->st_blocks = 1;
-	st->st_blksize=1<<a->blocksize;
-	return 0;
+        inode inod;
+        get_inode(a, inum, &inod, fd);
+        st->st_ino = (uint32_t)inum + 1;
+        st->st_mode = dir | inod.permissions;
+        st->st_nlink = inod.links;
+        st->st_size = inod.size;
+        st->st_uid = inod.user;
+        st->st_gid = inod.group;
+        st->st_ctime = inod.created;
+        st->st_mtime = inod.modified;
+        st->st_atime = inod.modified;
+        if(inod.size!=0)
+                st->st_blocks = (((inod.size-1)>>(a->blocksize))+1)<<(a->blocksize-9);
+        else
+                st->st_blocks = 1<<(a->blocksize-9);
+        st->st_blksize=1<<a->blocksize;
+        return 0;
 }
 
 int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags){
