@@ -1116,35 +1116,59 @@ int64_t size_chain(header* a, page current, int fd){
 }
 
 int64_t scan_filesystem(header* a, int fd){
-	const uint64_t blocksize = 1 << a->blocksize;
-	const uint64_t fat_start = blocksize * (a->resblocks + 1);
-	const uint64_t data_start = blocksize * (a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
-	const uint64_t fat_length = blocksize * a->fatsize;
+        const uint64_t blocksize = 1 << a->blocksize;
+        const uint64_t fat_start = blocksize * (a->resblocks + 1);
+        const uint64_t data_start = blocksize * (a->resblocks + a->fatsize + a->rootdirsize + a->inodes + 1);
+        const uint64_t fat_length = blocksize * a->fatsize;
+        const uint64_t inode_length = (1<<a->blocksize)*a->inodes;
 
-	for(uint32_t i = 0; i< blocksize*a->inodes/32; i++){
-		if((inodes+i)->links==0)
-			continue;
-		printf("FSCK: info of inode %d\n",i);
-		printf("FSCK: \texpected size: %lu bytes\n\tstart: %lu\n",(inodes+i)->size,page2int((inodes+i)->start));
-		int64_t size = size_chain(a,(inodes+i)->start,fd);
-		printf("FSCK: \tactual size: %ld blocks\n",size);
-		if((inodes+i)->size!=0){
-			if(size==((inodes+i)->size-1)/blocksize)
-				puts("FSCK: inode OK\n");
-			else{
-				printf("FSCK: inode %du has errors\nFSCK: press y to repair, nothing to continue",i);
-				char answer;
-				read(0,&answer,1);
-				if(answer=='y'){
-					//compare size with clamped size
-					//int64_t clamped = (inodes+i)->size-1)/blocksize;
-					//if(clamped>size)
-					//shrink_inode(a,i,(inodes+i)->size-,fd
-				}
-			}
-		}
-		else if(size==0)
-			puts("FSCK: inode OK\n");
-	}
-	puts("FSCK complete");
+//      (inodes+215)->links=0;
+
+        uint8_t* map = malloc(fat_length/8); //bitmap
+
+        int c;
+
+        for(uint32_t i = 0; i< blocksize*a->inodes/32; i++){
+                if((inodes+i)->links==0){
+//                      printf("empty inode at %d, size: %lu\n",i,(inodes+i)->size);
+//                      scanf("%d",&c);
+                        continue;
+                }
+//              printf("FSCK: info of inode %d\n",i);
+                //printf("FSCK: \texpected size: %lu bytes\n\tstart: %lu\n",(inodes+i)->size,page2int((inodes+i)->start));
+                int64_t size = size_chain(a,(inodes+i)->start,map,fd);
+//              printf("FSCK: \tactual size: %ld blocks\n",size);
+                if((inodes+i)->size!=0){
+                        if(size==((inodes+i)->size-1)/blocksize){
+//                              puts("FSCK: inode OK");
+                        }
+                        else{
+                                printf("FSCK: inode %du has errors\nFSCK: press y to repair, nothing to continue",i);
+                                char answer;
+                                read(0,&answer,1);
+                                if(answer=='y'){
+                                        (inodes+i)->links=0;
+                                }
+                        }
+                }
+//              else if(size==0)
+//                      puts("FSCK: inode OK\n");
+        }
+        puts("checking orphan chains");
+
+
+        for(uint64_t i = 0; i<fat_length/6; i++){
+                if(page2int(*(fat+i))!=0){
+                        if( (*(map+(i/8)) & 1<<(i%8)) == 0 ){
+                                printf("orphan at %lu\n",i);
+                                puts("free?");
+                                char answer;
+                                scanf("%c",&answer);
+                                if(answer=='y')
+                                        *(fat+i)=int2page(0);
+                        }
+                }
+        }
+
+        puts("FSCK complete");
 }
