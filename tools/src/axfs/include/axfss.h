@@ -744,12 +744,14 @@ uint64_t path2inode (header* a, char* p, uint16_t user, uint16_t* groups, uint16
 			get_inode(a,dirstruct.inode,&directory,fd);
 			dir=malloc(directory.size);
 			//check execute bit
+			if(i!=pathix-1){ //POSIX mandates that the execute bit should be set only on the parent
 			if (eval_permissions(a,dirstruct.inode, 01, user, groups, groupc, fd)){
 				puts("permission denied");
 				free(dir);
 				free(path);
 				free(pathv);
 				return -2;
+			}
 			}
 			read_inode(a,dirstruct.inode,&directory,dir,0,directory.size,fd);
 		}
