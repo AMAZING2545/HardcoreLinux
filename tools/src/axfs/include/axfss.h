@@ -803,8 +803,8 @@ int64_t create_file(header* a, char* p, uint16_t permissions, uint16_t user, uin
 	}
 	inode inod;
 	get_inode(a, inum, &inod, fd);
-	//check permissions (r w)
-	if(eval_permissions(a,inum, 05, user, groups, groupc, fd)){
+	//check permissions (w and x)
+	if(eval_permissions(a,inum, 03, user, groups, groupc, fd)){
 		puts("permission denied");
 		free(path);
 		return -1;
@@ -878,7 +878,7 @@ int64_t create_directory(header* a, char* p, uint16_t permissions, uint16_t user
 	inode inod;
 	get_inode(a, inum, &inod, fd);
 	//check permissions (w and x)
-	if(eval_permissions(a,inum, 05, user, groups, groupc, fd)){
+	if(eval_permissions(a,inum, 03, user, groups, groupc, fd)){
 		free(path);
 		puts("permission denied");
 		return -1;
@@ -962,7 +962,7 @@ int64_t create_symlink(header* a, char* p, char* dest, uint16_t user, uint16_t* 
 	inode inod;
 	get_inode(a, inum, &inod, fd);
 	//check permissions (w and x)
-	if(eval_permissions(a,inum, 05, user, groups, groupc, fd)){
+	if(eval_permissions(a,inum, 03, user, groups, groupc, fd)){
 		puts("permission denied");
 		return -1;
 	}
@@ -1044,7 +1044,7 @@ uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	inode inod;
 	get_inode(a, inum, &inod, fd);
 	//check permissions of parent (w and x)
-	if(eval_permissions(a,inum, 05, user, groups, groupc, fd)){
+	if(eval_permissions(a,inum, 03, user, groups, groupc, fd)){
 		puts("unlink: permission denied");
 		return -2;
 	}
