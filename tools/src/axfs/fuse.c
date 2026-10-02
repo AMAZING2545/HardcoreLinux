@@ -78,6 +78,8 @@ int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
         if(inum==-2) return -EACCES;
 	inode i;
 	if(inum>>32 != 1) return -ENOENT;
+	if(eval_permissions(a,inum, 05, user, groups, groupc, fd))
+		return -EACCES;
 	get_inode(a, inum, &i, fd);
         file* data = malloc(i.size);
         read_inode(a, inum, &i, (void*)data, 0, i.size, fd);
@@ -212,7 +214,7 @@ int axfs_create(const char *path, mode_t mode, struct fuse_file_info *fi){
 	uint64_t inod=create_file(a, path,mode,user,&groups,groupc, fd);
 	switch(inod){
 		case -1:
-			return -EEXIST;
+			return -EACCES;
 		case -2:
 			return -ENOENT;
 		default:
