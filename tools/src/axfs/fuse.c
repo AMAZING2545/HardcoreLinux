@@ -78,7 +78,7 @@ int axfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs
         if(inum==-2) return -EACCES;
 	inode i;
 	if(inum>>32 != 1) return -ENOENT;
-	if(eval_permissions(a,inum, 05, user, groups, groupc, fd))
+	if(eval_permissions(a,inum, 04, user, &groups, groupc, fd))
 		return -EACCES;
 	get_inode(a, inum, &i, fd);
         file* data = malloc(i.size);

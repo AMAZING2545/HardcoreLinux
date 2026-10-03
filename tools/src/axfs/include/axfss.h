@@ -1098,7 +1098,7 @@ uint64_t unlink_file(header* a, char* p, uint16_t user, uint16_t* groups, uint16
 	return del.links;
 }
 
-int64_t size_chain(header* a, page current, int fd){
+/*int64_t size_chain(header* a, page current, int fd){
 	const uint64_t blocksize = 1 << a->blocksize;
 	const uint64_t fat_start = blocksize * (a->resblocks + 1);
 	const uint64_t fat_length = blocksize * a->fatsize;
@@ -1174,3 +1174,4 @@ int64_t scan_filesystem(header* a, int fd){
 
         puts("FSCK complete");
 }
+*/
